@@ -1,20 +1,39 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { LogIn } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
+import { useNavigate } from 'react-router-dom';
 
 export default function LoginPage() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
-  const { login } = useAuth();
+  const [isLoading, setIsLoading] = useState(false);
+  const { login, isAuthenticated } = useAuth();
+  const navigate = useNavigate();
 
-  const handleSubmit = (e) => {
+  // Redirect if already authenticated
+  useEffect(() => {
+    if (isAuthenticated) {
+      navigate('/admin/dashboard');
+    }
+  }, [isAuthenticated, navigate]);
+
+  const handleSubmit = async (e) => {
     e.preventDefault();
     setError('');
+    setIsLoading(true);
 
-    const success = login(email, password);
-    if (!success) {
-      setError('Invalid credentials. Use admin@foundation.com / admin123');
+    try {
+      const success = login(email, password);
+      if (success) {
+        navigate('/admin/dashboard');
+      } else {
+        setError('Invalid credentials. Use admin@foundation.com / admin123');
+      }
+    } catch (err) {
+      setError('Login failed. Please try again.');
+    } finally {
+      setIsLoading(false);
     }
   };
 
@@ -26,7 +45,9 @@ export default function LoginPage() {
             <LogIn className="w-8 h-8 text-white" />
           </div>
           <h1 className="text-2xl font-bold text-gray-800">Admin Login</h1>
-          <p className="text-gray-600 mt-2">MAHA SHREE RUDRA SAMSTHANAM FOUNDATION</p>
+          <p className="text-gray-600 mt-2">
+            MAHA SHREE RUDRA SAMSTHANAM FOUNDATION
+          </p>
         </div>
 
         <form onSubmit={handleSubmit} className="space-y-6">
@@ -41,6 +62,7 @@ export default function LoginPage() {
               className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-900 focus:border-transparent outline-none"
               placeholder="admin@foundation.com"
               required
+              disabled={isLoading}
             />
           </div>
 
@@ -55,6 +77,7 @@ export default function LoginPage() {
               className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-900 focus:border-transparent outline-none"
               placeholder="Enter password"
               required
+              disabled={isLoading}
             />
           </div>
 
@@ -66,15 +89,18 @@ export default function LoginPage() {
 
           <button
             type="submit"
-            className="w-full bg-blue-900 text-white py-3 rounded-lg font-semibold hover:bg-blue-800 transition-colors"
+            disabled={isLoading}
+            className="w-full bg-blue-900 text-white py-3 rounded-lg font-semibold hover:bg-blue-800 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
           >
-            Sign In
+            {isLoading ? 'Signing In...' : 'Sign In'}
           </button>
         </form>
 
         <div className="mt-6 text-center text-sm text-gray-500">
           <p>Demo Credentials:</p>
-          <p className="font-mono text-xs mt-1">admin@foundation.com / admin123</p>
+          <p className="font-mono text-xs mt-1">
+            admin@foundation.com / admin123
+          </p>
         </div>
       </div>
     </div>

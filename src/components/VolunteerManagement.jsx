@@ -1,31 +1,53 @@
 import { useState } from 'react';
-import { Plus, Search, CheckCircle, XCircle, Edit2, Trash2, Mail, Phone } from 'lucide-react';
+import { Plus, Search, CheckCircle, XCircle, Edit2, Trash2, Mail, Phone, Eye } from 'lucide-react';
 import { useData } from '../contexts/DataContext';
+import ViewVolunteerModal from '../pages/ViewVolunteerModal';
 
 export default function VolunteerManagement() {
   const { volunteers, addVolunteer, updateVolunteer, deleteVolunteer } = useData();
   const [showModal, setShowModal] = useState(false);
+  const [viewModal, setViewModal] = useState(false);
   const [editingVolunteer, setEditingVolunteer] = useState(null);
+  const [viewingVolunteer, setViewingVolunteer] = useState(null);
   const [searchTerm, setSearchTerm] = useState('');
   const [filterStatus, setFilterStatus] = useState('all');
 
   const [formData, setFormData] = useState({
+    // Personal Details
     fullName: '',
+    qualification: '',
+    gender: '',
+    bloodGroup: '',
+    address: '',
+    phoneNumber: '',
     email: '',
-    phone: '',
-    interestArea: 'Temple Service',
+    occupation: '',
+    dateOfBirth: '',
+    bloodDonor: '',
+    maritalStatus: '',
+    
+    // Volunteer Preferences
+    templeService: false,
+    socialService: false,
+    educationalSupport: false,
+    events: false,
+    medicalCamps: false,
+    othersInterest: false,
+    weekdays: false,
+    weekends: false,
+    flexible: false,
+    specificTime: false,
+    
+    // Feedback & Suggestions
+    feedback: '',
+    
+    // Management fields
     status: 'pending',
-    notes: ''
+    adminNotes: ''
   });
 
-  const interestAreas = [
-    'Temple Service',
-    'Social Service',
-    'Education',
-    'Medical Support',
-    'Event Management',
-    'Cultural Activities'
-  ];
+  const bloodGroups = ['A+', 'A-', 'B+', 'B-', 'AB+', 'AB-', 'O+', 'O-'];
+  const maritalStatuses = ['Single', 'Married', 'Divorced', 'Widowed'];
 
   const handleSubmit = (e) => {
     e.preventDefault();
@@ -40,11 +62,29 @@ export default function VolunteerManagement() {
   const resetForm = () => {
     setFormData({
       fullName: '',
+      qualification: '',
+      gender: '',
+      bloodGroup: '',
+      address: '',
+      phoneNumber: '',
       email: '',
-      phone: '',
-      interestArea: 'Temple Service',
+      occupation: '',
+      dateOfBirth: '',
+      bloodDonor: '',
+      maritalStatus: '',
+      templeService: false,
+      socialService: false,
+      educationalSupport: false,
+      events: false,
+      medicalCamps: false,
+      othersInterest: false,
+      weekdays: false,
+      weekends: false,
+      flexible: false,
+      specificTime: false,
+      feedback: '',
       status: 'pending',
-      notes: ''
+      adminNotes: ''
     });
     setEditingVolunteer(null);
     setShowModal(false);
@@ -52,15 +92,13 @@ export default function VolunteerManagement() {
 
   const handleEdit = (volunteer) => {
     setEditingVolunteer(volunteer);
-    setFormData({
-      fullName: volunteer.fullName,
-      email: volunteer.email,
-      phone: volunteer.phone,
-      interestArea: volunteer.interestArea,
-      status: volunteer.status,
-      notes: volunteer.notes || ''
-    });
+    setFormData({ ...volunteer });
     setShowModal(true);
+  };
+
+  const handleView = (volunteer) => {
+    setViewingVolunteer(volunteer);
+    setViewModal(true);
   };
 
   const handleApprove = (id) => {
@@ -71,9 +109,23 @@ export default function VolunteerManagement() {
     updateVolunteer(id, { status: 'rejected' });
   };
 
+  const handleInterestChange = (interest) => {
+    setFormData(prev => ({
+      ...prev,
+      [interest]: !prev[interest]
+    }));
+  };
+
+  const handleAvailabilityChange = (availability) => {
+    setFormData(prev => ({
+      ...prev,
+      [availability]: !prev[availability]
+    }));
+  };
+
   const filteredVolunteers = volunteers.filter(volunteer => {
-    const matchesSearch = volunteer.fullName.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                         volunteer.email.toLowerCase().includes(searchTerm.toLowerCase());
+    const matchesSearch = volunteer.fullName?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                         volunteer.email?.toLowerCase().includes(searchTerm.toLowerCase());
     const matchesStatus = filterStatus === 'all' || volunteer.status === filterStatus;
     return matchesSearch && matchesStatus;
   });
@@ -84,6 +136,17 @@ export default function VolunteerManagement() {
       case 'rejected': return 'bg-red-100 text-red-800';
       default: return 'bg-yellow-100 text-yellow-800';
     }
+  };
+
+  const getSelectedInterests = (volunteer) => {
+    const interests = [];
+    if (volunteer.templeService) interests.push('Temple Service');
+    if (volunteer.socialService) interests.push('Social Service');
+    if (volunteer.educationalSupport) interests.push('Educational Support');
+    if (volunteer.events) interests.push('Events');
+    if (volunteer.medicalCamps) interests.push('Medical Camps');
+    if (volunteer.othersInterest) interests.push('Others');
+    return interests.join(', ');
   };
 
   return (
@@ -132,16 +195,22 @@ export default function VolunteerManagement() {
               <tr className="bg-gray-50 border-b border-gray-200">
                 <th className="text-left py-3 px-4 font-semibold text-gray-700">Name</th>
                 <th className="text-left py-3 px-4 font-semibold text-gray-700">Contact</th>
-                <th className="text-left py-3 px-4 font-semibold text-gray-700">Interest Area</th>
+                <th className="text-left py-3 px-4 font-semibold text-gray-700">Qualification</th>
+                <th className="text-left py-3 px-4 font-semibold text-gray-700">Interests</th>
+                <th className="text-left py-3 px-4 font-semibold text-gray-700">Blood Group</th>
                 <th className="text-left py-3 px-4 font-semibold text-gray-700">Status</th>
-                <th className="text-left py-3 px-4 font-semibold text-gray-700">Date</th>
                 <th className="text-left py-3 px-4 font-semibold text-gray-700">Actions</th>
               </tr>
             </thead>
             <tbody>
               {filteredVolunteers.map((volunteer) => (
                 <tr key={volunteer.id} className="border-b border-gray-100 hover:bg-gray-50">
-                  <td className="py-3 px-4 font-medium text-gray-800">{volunteer.fullName}</td>
+                  <td className="py-3 px-4">
+                    <div>
+                      <div className="font-medium text-gray-800">{volunteer.fullName}</div>
+                      <div className="text-sm text-gray-500">{volunteer.occupation}</div>
+                    </div>
+                  </td>
                   <td className="py-3 px-4">
                     <div className="flex flex-col space-y-1 text-sm">
                       <div className="flex items-center space-x-2">
@@ -150,21 +219,33 @@ export default function VolunteerManagement() {
                       </div>
                       <div className="flex items-center space-x-2">
                         <Phone className="w-4 h-4 text-gray-400" />
-                        <span className="text-gray-600">{volunteer.phone}</span>
+                        <span className="text-gray-600">{volunteer.phoneNumber}</span>
                       </div>
                     </div>
                   </td>
-                  <td className="py-3 px-4 text-gray-600">{volunteer.interestArea}</td>
+                  <td className="py-3 px-4 text-gray-600 text-sm">
+                    {volunteer.qualification}
+                  </td>
+                  <td className="py-3 px-4 text-gray-600 text-sm">
+                    {getSelectedInterests(volunteer)}
+                  </td>
+                  <td className="py-3 px-4 text-gray-600">
+                    {volunteer.bloodGroup || '-'}
+                  </td>
                   <td className="py-3 px-4">
                     <span className={`px-3 py-1 rounded-full text-xs font-semibold ${getStatusColor(volunteer.status)}`}>
                       {volunteer.status}
                     </span>
                   </td>
-                  <td className="py-3 px-4 text-gray-600 text-sm">
-                    {new Date(volunteer.applicationDate).toLocaleDateString()}
-                  </td>
                   <td className="py-3 px-4">
                     <div className="flex items-center space-x-2">
+                      <button
+                        onClick={() => handleView(volunteer)}
+                        className="p-1 text-green-600 hover:bg-green-50 rounded"
+                        title="View"
+                      >
+                        <Eye className="w-5 h-5" />
+                      </button>
                       {volunteer.status === 'pending' && (
                         <>
                           <button
@@ -209,87 +290,278 @@ export default function VolunteerManagement() {
         </div>
       </div>
 
+      {/* Add/Edit Modal */}
       {showModal && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-xl max-w-2xl w-full max-h-[90vh] overflow-y-auto">
+          <div className="bg-white rounded-xl max-w-4xl w-full max-h-[90vh] overflow-y-auto">
             <div className="p-6 border-b border-gray-200">
               <h2 className="text-2xl font-bold text-gray-800">
                 {editingVolunteer ? 'Edit Volunteer' : 'Add New Volunteer'}
               </h2>
             </div>
 
-            <form onSubmit={handleSubmit} className="p-6 space-y-4">
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">Full Name</label>
-                <input
-                  type="text"
-                  value={formData.fullName}
-                  onChange={(e) => setFormData({ ...formData, fullName: e.target.value })}
-                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-900 focus:border-transparent outline-none"
-                  required
-                />
+            <form onSubmit={handleSubmit} className="p-6 space-y-6">
+              {/* Personal Details Section */}
+              <div className="border-b border-gray-200 pb-6">
+                <h3 className="text-xl font-bold text-gray-800 mb-4">Personal Details</h3>
+                
+                <div className="space-y-4">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">Name *</label>
+                    <input
+                      type="text"
+                      value={formData.fullName}
+                      onChange={(e) => setFormData({ ...formData, fullName: e.target.value })}
+                      className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-900 focus:border-transparent outline-none"
+                      required
+                    />
+                  </div>
+
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-2">Qualification</label>
+                      <input
+                        type="text"
+                        value={formData.qualification}
+                        onChange={(e) => setFormData({ ...formData, qualification: e.target.value })}
+                        placeholder="e.g. B.Tech, MBA"
+                        className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-900 focus:border-transparent outline-none"
+                      />
+                    </div>
+
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-2">Gender</label>
+                      <select
+                        value={formData.gender}
+                        onChange={(e) => setFormData({ ...formData, gender: e.target.value })}
+                        className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-900 focus:border-transparent outline-none"
+                      >
+                        <option value="">Select Gender</option>
+                        <option value="male">Male</option>
+                        <option value="female">Female</option>
+                        <option value="other">Other</option>
+                      </select>
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-2">Blood Group</label>
+                      <select
+                        value={formData.bloodGroup}
+                        onChange={(e) => setFormData({ ...formData, bloodGroup: e.target.value })}
+                        className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-900 focus:border-transparent outline-none"
+                      >
+                        <option value="">Select Blood Group</option>
+                        {bloodGroups.map(group => (
+                          <option key={group} value={group}>{group}</option>
+                        ))}
+                      </select>
+                    </div>
+
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-2">Marital Status</label>
+                      <select
+                        value={formData.maritalStatus}
+                        onChange={(e) => setFormData({ ...formData, maritalStatus: e.target.value })}
+                        className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-900 focus:border-transparent outline-none"
+                      >
+                        <option value="">Select Marital Status</option>
+                        {maritalStatuses.map(status => (
+                          <option key={status} value={status}>{status}</option>
+                        ))}
+                      </select>
+                    </div>
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">Address</label>
+                    <textarea
+                      value={formData.address}
+                      onChange={(e) => setFormData({ ...formData, address: e.target.value })}
+                      rows="3"
+                      placeholder="Enter full address"
+                      className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-900 focus:border-transparent outline-none"
+                    ></textarea>
+                  </div>
+
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-2">Phone Number</label>
+                      <input
+                        type="tel"
+                        value={formData.phoneNumber}
+                        onChange={(e) => setFormData({ ...formData, phoneNumber: e.target.value })}
+                        placeholder="Enter phone number"
+                        className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-900 focus:border-transparent outline-none"
+                      />
+                    </div>
+
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-2">Email ID *</label>
+                      <input
+                        type="email"
+                        value={formData.email}
+                        onChange={(e) => setFormData({ ...formData, email: e.target.value })}
+                        className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-900 focus:border-transparent outline-none"
+                        required
+                      />
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-2">Occupation / Profession</label>
+                      <input
+                        type="text"
+                        value={formData.occupation}
+                        onChange={(e) => setFormData({ ...formData, occupation: e.target.value })}
+                        placeholder="e.g. Software Engineer, Teacher"
+                        className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-900 focus:border-transparent outline-none"
+                      />
+                    </div>
+
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-2">Date of Birth</label>
+                      <input
+                        type="date"
+                        value={formData.dateOfBirth}
+                        onChange={(e) => setFormData({ ...formData, dateOfBirth: e.target.value })}
+                        className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-900 focus:border-transparent outline-none"
+                      />
+                    </div>
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                      Would you like to be an active blood donor?
+                    </label>
+                    <div className="flex space-x-4">
+                      <label className="flex items-center space-x-2">
+                        <input
+                          type="radio"
+                          name="bloodDonor"
+                          value="yes"
+                          checked={formData.bloodDonor === 'yes'}
+                          onChange={(e) => setFormData({ ...formData, bloodDonor: e.target.value })}
+                          className="w-4 h-4 text-blue-900"
+                        />
+                        <span className="text-gray-700">Yes</span>
+                      </label>
+                      <label className="flex items-center space-x-2">
+                        <input
+                          type="radio"
+                          name="bloodDonor"
+                          value="no"
+                          checked={formData.bloodDonor === 'no'}
+                          onChange={(e) => setFormData({ ...formData, bloodDonor: e.target.value })}
+                          className="w-4 h-4 text-blue-900"
+                        />
+                        <span className="text-gray-700">No</span>
+                      </label>
+                    </div>
+                  </div>
+                </div>
               </div>
 
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">Email</label>
-                  <input
-                    type="email"
-                    value={formData.email}
-                    onChange={(e) => setFormData({ ...formData, email: e.target.value })}
-                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-900 focus:border-transparent outline-none"
-                    required
-                  />
-                </div>
+              {/* Volunteer Preferences Section */}
+              <div className="border-b border-gray-200 pb-6">
+                <h3 className="text-xl font-bold text-gray-800 mb-4">Volunteer Preferences</h3>
+                
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
+                  <div>
+                    <h4 className="font-semibold text-gray-700 mb-3">Areas of Interest:</h4>
+                    <div className="space-y-2">
+                      {[
+                        { key: 'templeService', label: 'Temple Service' },
+                        { key: 'socialService', label: 'Social Service' },
+                        { key: 'educationalSupport', label: 'Educational Support' },
+                        { key: 'events', label: 'Events' },
+                        { key: 'medicalCamps', label: 'Medical Camps' },
+                        { key: 'othersInterest', label: 'Others' }
+                      ].map(({ key, label }) => (
+                        <label key={key} className="flex items-center space-x-3">
+                          <input
+                            type="checkbox"
+                            checked={formData[key]}
+                            onChange={() => handleInterestChange(key)}
+                            className="w-4 h-4 text-blue-900 rounded focus:ring-blue-900"
+                          />
+                          <span className="text-gray-700">{label}</span>
+                        </label>
+                      ))}
+                    </div>
+                  </div>
 
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">Phone</label>
-                  <input
-                    type="tel"
-                    value={formData.phone}
-                    onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
-                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-900 focus:border-transparent outline-none"
-                    required
-                  />
+                  <div>
+                    <h4 className="font-semibold text-gray-700 mb-3">Availability:</h4>
+                    <div className="space-y-2">
+                      {[
+                        { key: 'weekdays', label: 'Weekdays' },
+                        { key: 'weekends', label: 'Weekends' },
+                        { key: 'flexible', label: 'Flexible' },
+                        { key: 'specificTime', label: 'Specific Time' }
+                      ].map(({ key, label }) => (
+                        <label key={key} className="flex items-center space-x-3">
+                          <input
+                            type="checkbox"
+                            checked={formData[key]}
+                            onChange={() => handleAvailabilityChange(key)}
+                            className="w-4 h-4 text-blue-900 rounded focus:ring-blue-900"
+                          />
+                          <span className="text-gray-700">{label}</span>
+                        </label>
+                      ))}
+                    </div>
+                  </div>
                 </div>
               </div>
 
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              {/* Feedback & Suggestions */}
+              <div className="border-b border-gray-200 pb-6">
+                <h3 className="text-xl font-bold text-gray-800 mb-4">Feedback & Suggestions</h3>
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">Interest Area</label>
-                  <select
-                    value={formData.interestArea}
-                    onChange={(e) => setFormData({ ...formData, interestArea: e.target.value })}
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Share your thoughts, suggestions, or any additional information...
+                  </label>
+                  <textarea
+                    value={formData.feedback}
+                    onChange={(e) => setFormData({ ...formData, feedback: e.target.value })}
+                    rows="4"
                     className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-900 focus:border-transparent outline-none"
-                  >
-                    {interestAreas.map(area => (
-                      <option key={area} value={area}>{area}</option>
-                    ))}
-                  </select>
-                </div>
-
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">Status</label>
-                  <select
-                    value={formData.status}
-                    onChange={(e) => setFormData({ ...formData, status: e.target.value })}
-                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-900 focus:border-transparent outline-none"
-                  >
-                    <option value="pending">Pending</option>
-                    <option value="approved">Approved</option>
-                    <option value="rejected">Rejected</option>
-                  </select>
+                  ></textarea>
                 </div>
               </div>
 
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">Notes</label>
-                <textarea
-                  value={formData.notes}
-                  onChange={(e) => setFormData({ ...formData, notes: e.target.value })}
-                  rows="3"
-                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-900 focus:border-transparent outline-none"
-                ></textarea>
+              {/* Admin Management Fields */}
+              <div className="bg-gray-50 p-4 rounded-lg">
+                <h3 className="text-lg font-bold text-gray-800 mb-4">Administration</h3>
+                
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">Status</label>
+                    <select
+                      value={formData.status}
+                      onChange={(e) => setFormData({ ...formData, status: e.target.value })}
+                      className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-900 focus:border-transparent outline-none"
+                    >
+                      <option value="pending">Pending</option>
+                      <option value="approved">Approved</option>
+                      <option value="rejected">Rejected</option>
+                    </select>
+                  </div>
+                </div>
+
+                <div className="mt-4">
+                  <label className="block text-sm font-medium text-gray-700 mb-2">Admin Notes</label>
+                  <textarea
+                    value={formData.adminNotes}
+                    onChange={(e) => setFormData({ ...formData, adminNotes: e.target.value })}
+                    rows="3"
+                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-900 focus:border-transparent outline-none"
+                    placeholder="Internal notes for administration..."
+                  ></textarea>
+                </div>
               </div>
 
               <div className="flex justify-end space-x-3 pt-4">
@@ -310,6 +582,14 @@ export default function VolunteerManagement() {
             </form>
           </div>
         </div>
+      )}
+
+      {/* View Modal */}
+      {viewModal && (
+        <ViewVolunteerModal
+          volunteer={viewingVolunteer}
+          onClose={() => setViewModal(false)}
+        />
       )}
     </div>
   );

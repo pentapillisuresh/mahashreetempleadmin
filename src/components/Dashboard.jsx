@@ -1,4 +1,4 @@
-import { Users, Calendar, CalendarDays, DollarSign, Globe, TrendingUp } from 'lucide-react';
+import { Users, Calendar, CalendarDays, IndianRupee, Globe, TrendingUp } from 'lucide-react';
 import { useData } from '../contexts/DataContext';
 
 export default function Dashboard() {
@@ -23,7 +23,7 @@ export default function Dashboard() {
     {
       label: 'Total Donations',
       value: `₹${totalDonations.toLocaleString()}`,
-      icon: DollarSign,
+      icon: IndianRupee,
       color: 'bg-green-500',
       change: `${donations.length} donations`
     },
