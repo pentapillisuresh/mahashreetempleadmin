@@ -598,7 +598,7 @@ export default function AppointmentManagement() {
                 
                 <div className="bg-gray-50 p-4 rounded-lg">
                   <p className="text-gray-700 mb-4">
-                    I confirm that the above details are true and accurate. I request to book an appointment for the mentioned service and understand that the final confirmation will be provided by the temple administration.
+                    I confirm that the above details are true and accurate. I request to book an appointment for the mentioned service and understand that the final confirmation will be provided by the temple administration
                   </p>
                   
                   <label className="flex items-center space-x-3">
