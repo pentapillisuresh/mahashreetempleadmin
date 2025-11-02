@@ -94,7 +94,7 @@ export default function Dashboard() {
             </div>
             <div className="flex justify-between items-center">
               <span className="text-gray-600">International Donations</span>
-              <span className="text-lg font-semibold text-blue-600">₹{internationalDonations.toLocaleString()}</span>
+              <span className="text-lg font-semibold text-blue-600">{internationalDonations.toLocaleString()}</span>
             </div>
             <div className="border-t pt-4 mt-4">
               <div className="flex justify-between items-center">
