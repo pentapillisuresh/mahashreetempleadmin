@@ -1,11 +1,14 @@
 import { useState, useMemo } from 'react';
-import { Plus, Search, Edit2, Trash2, Download, Mail, Calendar, ChevronDown, FileText } from 'lucide-react';
+import { Plus, Search, Edit2, Trash2, Download, Mail, Calendar, ChevronDown, Eye } from 'lucide-react';
 import { useData } from '../contexts/DataContext';
+import PDFPreviewModal from '../pages/PDFPreviewModal';
 import DonationReceiptPDF from '../pages/DonationReceiptPDF';
 
 export default function DonationManagement() {
   const { donations, addDonation, updateDonation, deleteDonation } = useData();
   const [showModal, setShowModal] = useState(false);
+  const [showPDFPreview, setShowPDFPreview] = useState(false);
+  const [previewDonation, setPreviewDonation] = useState(null);
   const [editingDonation, setEditingDonation] = useState(null);
   const [searchTerm, setSearchTerm] = useState('');
   const [filterType, setFilterType] = useState('all');
@@ -28,37 +31,34 @@ export default function DonationManagement() {
     receiptSent: false
   });
 
-  // Get unique years and months from donations
   const { availableYears, availableMonths } = useMemo(() => {
     const yearsSet = new Set();
-    const monthsMap = new Map(); // year -> Set(months)
-    
+    const monthsMap = new Map();
+
     donations.forEach(donation => {
       const date = new Date(donation.donationDate);
       const year = date.getFullYear().toString();
-      const month = date.getMonth() + 1; // 1-12
-      
+      const month = date.getMonth() + 1;
+
       yearsSet.add(year);
-      
+
       if (!monthsMap.has(year)) {
         monthsMap.set(year, new Set());
       }
       monthsMap.get(year).add(month);
     });
-    
+
     const years = Array.from(yearsSet).sort((a, b) => parseInt(b) - parseInt(a));
     const months = new Map();
-    
-    // Convert months to sorted arrays for each year
+
     monthsMap.forEach((monthSet, year) => {
       const sortedMonths = Array.from(monthSet).sort((a, b) => a - b);
       months.set(year, sortedMonths);
     });
-    
+
     return { availableYears: years, availableMonths: months };
   }, [donations]);
 
-  // Get available months for selected year
   const getAvailableMonthsForYear = (year) => {
     return availableMonths.get(year) || [];
   };
@@ -103,8 +103,9 @@ export default function DonationManagement() {
     alert('Receipt sent to donor email successfully!');
   };
 
-  const handleDownloadPDF = (donation) => {
-    DonationReceiptPDF.generatePDF(donation);
+  const handlePreviewPDF = (donation) => {
+    setPreviewDonation(donation);
+    setShowPDFPreview(true);
   };
 
   const filteredDonations = donations.filter(donation => {
@@ -112,19 +113,17 @@ export default function DonationManagement() {
                          donation.donorEmail.toLowerCase().includes(searchTerm.toLowerCase()) ||
                          (donation.panNumber && donation.panNumber.toLowerCase().includes(searchTerm.toLowerCase()));
     const matchesType = filterType === 'all' || donation.type === filterType;
-    
-    // Year and month filter logic
+
     const donationDate = new Date(donation.donationDate);
     const donationYear = donationDate.getFullYear().toString();
     const donationMonth = donationDate.getMonth() + 1;
-    
+
     const matchesYear = filterYear === 'all' || donationYear === filterYear;
     const matchesMonth = filterMonth === 'all' || donationMonth === parseInt(filterMonth);
-    
+
     return matchesSearch && matchesType && matchesYear && matchesMonth;
   });
 
-  // Calculate statistics based on filtered donations
   const totalAmount = filteredDonations.reduce((sum, d) => sum + Number(d.amount), 0);
   const domesticAmount = filteredDonations
     .filter(d => d.type === 'domestic')
@@ -133,7 +132,6 @@ export default function DonationManagement() {
     .filter(d => d.type === 'international')
     .reduce((sum, d) => sum + Number(d.amount), 0);
 
-  // Format month for display
   const formatMonthDisplay = (monthNumber) => {
     const date = new Date(2000, monthNumber - 1, 1);
     return date.toLocaleDateString('en-US', { month: 'short' });
@@ -150,10 +148,8 @@ export default function DonationManagement() {
     if (year === 'all') {
       setFilterMonth('all');
     } else {
-      // Set to first available month or 'all'
       const months = getAvailableMonthsForYear(year);
       if (months.length > 0 && filterMonth !== 'all') {
-        // Keep current month if available in new year, otherwise set to all
         if (!months.includes(parseInt(filterMonth))) {
           setFilterMonth('all');
         }
@@ -173,7 +169,7 @@ export default function DonationManagement() {
 
   const exportData = () => {
     const dataToExport = filterYear === 'all' ? donations : filteredDonations;
-    
+
     const csvData = dataToExport.map(d => ({
       Date: new Date(d.donationDate).toLocaleDateString(),
       Donor: d.donorName,
@@ -225,7 +221,6 @@ export default function DonationManagement() {
         </div>
       </div>
 
-      {/* Statistics Cards */}
       <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
         <div className="bg-white rounded-xl shadow-md p-6">
           <h3 className="text-sm font-medium text-gray-600">Total Donations</h3>
@@ -260,7 +255,6 @@ export default function DonationManagement() {
         </div>
       </div>
 
-      {/* Filters Section */}
       <div className="bg-white rounded-xl shadow-md p-6">
         <div className="flex flex-col sm:flex-row gap-4 mb-6">
           <div className="flex-1 relative">
@@ -273,9 +267,8 @@ export default function DonationManagement() {
               className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-900 focus:border-transparent outline-none"
             />
           </div>
-          
+
           <div className="flex gap-3">
-            {/* Date Filter Dropdown */}
             <div className="relative">
               <button
                 onClick={() => setShowMonthFilter(!showMonthFilter)}
@@ -298,9 +291,8 @@ export default function DonationManagement() {
                         Clear
                       </button>
                     </div>
-                    
+
                     <div className="grid grid-cols-2 gap-2">
-                      {/* Year Selector */}
                       <div>
                         <label className="block text-xs font-medium text-gray-600 mb-1">Year</label>
                         <select
@@ -316,7 +308,6 @@ export default function DonationManagement() {
                         </select>
                       </div>
 
-                      {/* Month Selector */}
                       <div>
                         <label className="block text-xs font-medium text-gray-600 mb-1">Month</label>
                         <select
@@ -327,7 +318,7 @@ export default function DonationManagement() {
                           disabled={filterYear === 'all'}
                         >
                           <option value="all">All Months</option>
-                          {filterYear !== 'all' && 
+                          {filterYear !== 'all' &&
                             getAvailableMonthsForYear(filterYear).map(month => (
                               <option key={month} value={month}>
                                 {formatMonthDisplay(month)}
@@ -359,7 +350,6 @@ export default function DonationManagement() {
           </div>
         </div>
 
-        {/* Donations Table */}
         <div className="overflow-x-auto">
           <table className="w-full">
             <thead>
@@ -404,7 +394,7 @@ export default function DonationManagement() {
                   <td className="py-3 px-4 text-gray-600">{donation.purpose || '-'}</td>
                   <td className="py-3 px-4">
                     <span className={`px-3 py-1 rounded-full text-xs font-semibold ${
-                      donation.status === 'completed' ? 'bg-green-100 text-green-800' : 
+                      donation.status === 'completed' ? 'bg-green-100 text-green-800' :
                       donation.status === 'pending' ? 'bg-yellow-100 text-yellow-800' : 'bg-red-100 text-red-800'
                     }`}>
                       {donation.status}
@@ -413,11 +403,11 @@ export default function DonationManagement() {
                   <td className="py-3 px-4">
                     <div className="flex items-center space-x-2">
                       <button
-                        onClick={() => handleDownloadPDF(donation)}
+                        onClick={() => handlePreviewPDF(donation)}
                         className="p-1 text-purple-600 hover:bg-purple-50 rounded"
-                        title="Download Receipt PDF"
+                        title="Preview & Download Receipt"
                       >
-                        <FileText className="w-5 h-5" />
+                        <Eye className="w-5 h-5" />
                       </button>
                       {!donation.receiptSent && (
                         <button
@@ -456,7 +446,6 @@ export default function DonationManagement() {
         </div>
       </div>
 
-      {/* Add/Edit Donation Modal */}
       {showModal && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
           <div className="bg-white rounded-xl max-w-3xl w-full max-h-[90vh] overflow-y-auto">
@@ -620,6 +609,15 @@ export default function DonationManagement() {
             </form>
           </div>
         </div>
+      )}
+
+      {showPDFPreview && previewDonation && (
+        <PDFPreviewModal
+          donation={previewDonation}
+          isOpen={showPDFPreview}
+          onClose={() => setShowPDFPreview(false)}
+          onDownload={() => DonationReceiptPDF.generatePDF(previewDonation)}
+        />
       )}
     </div>
   );
