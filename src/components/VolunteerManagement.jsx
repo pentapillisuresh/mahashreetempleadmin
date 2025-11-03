@@ -13,7 +13,6 @@ export default function VolunteerManagement() {
   const [filterStatus, setFilterStatus] = useState('all');
 
   const [formData, setFormData] = useState({
-    // Personal Details
     fullName: '',
     qualification: '',
     gender: '',
@@ -25,8 +24,6 @@ export default function VolunteerManagement() {
     dateOfBirth: '',
     bloodDonor: '',
     maritalStatus: '',
-    
-    // Volunteer Preferences
     templeService: false,
     socialService: false,
     educationalSupport: false,
@@ -37,11 +34,7 @@ export default function VolunteerManagement() {
     weekends: false,
     flexible: false,
     specificTime: false,
-    
-    // Feedback & Suggestions
     feedback: '',
-    
-    // Management fields
     status: 'pending',
     adminNotes: ''
   });
@@ -102,11 +95,24 @@ export default function VolunteerManagement() {
   };
 
   const handleApprove = (id) => {
-    updateVolunteer(id, { status: 'approved' });
+    updateVolunteer(id, {
+      status: 'approved',
+      adminNotes: formData.adminNotes || 'Volunteer application approved.'
+    });
   };
 
   const handleReject = (id) => {
-    updateVolunteer(id, { status: 'rejected' });
+    updateVolunteer(id, {
+      status: 'rejected',
+      adminNotes: formData.adminNotes || 'Volunteer application rejected.'
+    });
+  };
+
+  const handleStatusChange = (id, newStatus) => {
+    updateVolunteer(id, {
+      status: newStatus,
+      adminNotes: formData.adminNotes || `Status changed to ${newStatus}`
+    });
   };
 
   const handleInterestChange = (interest) => {
@@ -125,16 +131,32 @@ export default function VolunteerManagement() {
 
   const filteredVolunteers = volunteers.filter(volunteer => {
     const matchesSearch = volunteer.fullName?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                         volunteer.email?.toLowerCase().includes(searchTerm.toLowerCase());
+                         volunteer.email?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                         volunteer.phoneNumber?.includes(searchTerm);
     const matchesStatus = filterStatus === 'all' || volunteer.status === filterStatus;
     return matchesSearch && matchesStatus;
   });
 
   const getStatusColor = (status) => {
     switch (status) {
-      case 'approved': return 'bg-green-100 text-green-800';
-      case 'rejected': return 'bg-red-100 text-red-800';
-      default: return 'bg-yellow-100 text-yellow-800';
+      case 'approved': return 'bg-green-100 text-green-800 border border-green-200';
+      case 'rejected': return 'bg-red-100 text-red-800 border border-red-200';
+      case 'pending': return 'bg-yellow-100 text-yellow-800 border border-yellow-200';
+      case 'active': return 'bg-blue-100 text-blue-800 border border-blue-200';
+      case 'inactive': return 'bg-gray-100 text-gray-800 border border-gray-200';
+      default: return 'bg-gray-100 text-gray-800 border border-gray-200';
+    }
+  };
+
+  const getStatusIcon = (status) => {
+    switch (status) {
+      case 'approved':
+      case 'active':
+        return <CheckCircle className="w-4 h-4" />;
+      case 'rejected':
+        return <XCircle className="w-4 h-4" />;
+      default:
+        return null;
     }
   };
 
@@ -146,7 +168,87 @@ export default function VolunteerManagement() {
     if (volunteer.events) interests.push('Events');
     if (volunteer.medicalCamps) interests.push('Medical Camps');
     if (volunteer.othersInterest) interests.push('Others');
-    return interests.join(', ');
+    return interests.length > 0 ? interests.join(', ') : 'No interests selected';
+  };
+
+  const getAvailability = (volunteer) => {
+    const availability = [];
+    if (volunteer.weekdays) availability.push('Weekdays');
+    if (volunteer.weekends) availability.push('Weekends');
+    if (volunteer.flexible) availability.push('Flexible');
+    if (volunteer.specificTime) availability.push('Specific Time');
+    return availability.length > 0 ? availability.join(', ') : 'Not specified';
+  };
+
+  const StatusBadge = ({ status, volunteer, onStatusChange }) => {
+    const [showDropdown, setShowDropdown] = useState(false);
+
+    const statusOptions = [
+      { value: 'pending', label: 'Pending', color: 'text-yellow-600' },
+      { value: 'approved', label: 'Approved', color: 'text-green-600' },
+      { value: 'rejected', label: 'Rejected', color: 'text-red-600' },
+      { value: 'active', label: 'Active', color: 'text-blue-600' },
+      { value: 'inactive', label: 'Inactive', color: 'text-gray-600' }
+    ];
+
+    return (
+      <div className="relative">
+        <button
+          onClick={() => setShowDropdown(!showDropdown)}
+          className={`px-3 py-1 rounded-full text-xs font-semibold flex items-center space-x-1 ${getStatusColor(status)} hover:opacity-80 transition-opacity`}
+        >
+          {getStatusIcon(status)}
+          <span className="capitalize">{status}</span>
+        </button>
+
+        {showDropdown && (
+          <>
+            <div
+              className="fixed inset-0 z-10"
+              onClick={() => setShowDropdown(false)}
+            />
+            <div className="absolute left-0 mt-1 w-40 bg-white rounded-lg shadow-lg border border-gray-200 z-20">
+              {statusOptions.map((option) => (
+                <button
+                  key={option.value}
+                  onClick={() => {
+                    onStatusChange(volunteer.id, option.value);
+                    setShowDropdown(false);
+                  }}
+                  className={`w-full text-left px-4 py-2 text-sm hover:bg-gray-50 first:rounded-t-lg last:rounded-b-lg flex items-center space-x-2 ${option.value === status ? 'bg-blue-50 text-blue-700' : ''}`}
+                >
+                  <div className={`w-2 h-2 rounded-full ${option.color.replace('text', 'bg')}`} />
+                  <span>{option.label}</span>
+                </button>
+              ))}
+            </div>
+          </>
+        )}
+      </div>
+    );
+  };
+
+  const QuickActionButtons = ({ volunteer, onApprove, onReject }) => {
+    if (volunteer.status !== 'pending') return null;
+
+    return (
+      <div className="flex items-center space-x-1">
+        <button
+          onClick={() => onApprove(volunteer.id)}
+          className="p-1.5 text-green-600 hover:bg-green-50 rounded-lg border border-green-200 transition-colors"
+          title="Approve Volunteer"
+        >
+          <CheckCircle className="w-4 h-4" />
+        </button>
+        <button
+          onClick={() => onReject(volunteer.id)}
+          className="p-1.5 text-red-600 hover:bg-red-50 rounded-lg border border-red-200 transition-colors"
+          title="Reject Volunteer"
+        >
+          <XCircle className="w-4 h-4" />
+        </button>
+      </div>
+    );
   };
 
   return (
@@ -165,13 +267,44 @@ export default function VolunteerManagement() {
         </button>
       </div>
 
+      <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
+        <div className="bg-white rounded-xl shadow-md p-4 border-l-4 border-blue-500">
+          <div className="text-2xl font-bold text-gray-800">{volunteers.length}</div>
+          <div className="text-gray-600 text-sm">Total Volunteers</div>
+        </div>
+        <div className="bg-white rounded-xl shadow-md p-4 border-l-4 border-yellow-500">
+          <div className="text-2xl font-bold text-gray-800">
+            {volunteers.filter(v => v.status === 'pending').length}
+          </div>
+          <div className="text-gray-600 text-sm">Pending</div>
+        </div>
+        <div className="bg-white rounded-xl shadow-md p-4 border-l-4 border-green-500">
+          <div className="text-2xl font-bold text-gray-800">
+            {volunteers.filter(v => v.status === 'approved').length}
+          </div>
+          <div className="text-gray-600 text-sm">Approved</div>
+        </div>
+        <div className="bg-white rounded-xl shadow-md p-4 border-l-4 border-red-500">
+          <div className="text-2xl font-bold text-gray-800">
+            {volunteers.filter(v => v.status === 'rejected').length}
+          </div>
+          <div className="text-gray-600 text-sm">Rejected</div>
+        </div>
+        <div className="bg-white rounded-xl shadow-md p-4 border-l-4 border-blue-500">
+          <div className="text-2xl font-bold text-gray-800">
+            {volunteers.filter(v => v.status === 'active').length}
+          </div>
+          <div className="text-gray-600 text-sm">Active</div>
+        </div>
+      </div>
+
       <div className="bg-white rounded-xl shadow-md p-6">
         <div className="flex flex-col sm:flex-row gap-4 mb-6">
           <div className="flex-1 relative">
             <Search className="w-5 h-5 absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" />
             <input
               type="text"
-              placeholder="Search volunteers..."
+              placeholder="Search volunteers by name, email, or phone..."
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
               className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-900 focus:border-transparent outline-none"
@@ -186,6 +319,8 @@ export default function VolunteerManagement() {
             <option value="pending">Pending</option>
             <option value="approved">Approved</option>
             <option value="rejected">Rejected</option>
+            <option value="active">Active</option>
+            <option value="inactive">Inactive</option>
           </select>
         </div>
 
@@ -193,29 +328,35 @@ export default function VolunteerManagement() {
           <table className="w-full">
             <thead>
               <tr className="bg-gray-50 border-b border-gray-200">
-                <th className="text-left py-3 px-4 font-semibold text-gray-700">Name</th>
+                <th className="text-left py-3 px-4 font-semibold text-gray-700">Volunteer</th>
                 <th className="text-left py-3 px-4 font-semibold text-gray-700">Contact</th>
                 <th className="text-left py-3 px-4 font-semibold text-gray-700">Qualification</th>
                 <th className="text-left py-3 px-4 font-semibold text-gray-700">Interests</th>
-                <th className="text-left py-3 px-4 font-semibold text-gray-700">Blood Group</th>
+                <th className="text-left py-3 px-4 font-semibold text-gray-700">Availability</th>
                 <th className="text-left py-3 px-4 font-semibold text-gray-700">Status</th>
                 <th className="text-left py-3 px-4 font-semibold text-gray-700">Actions</th>
               </tr>
             </thead>
             <tbody>
               {filteredVolunteers.map((volunteer) => (
-                <tr key={volunteer.id} className="border-b border-gray-100 hover:bg-gray-50">
+                <tr key={volunteer.id} className="border-b border-gray-100 hover:bg-gray-50 transition-colors">
                   <td className="py-3 px-4">
                     <div>
                       <div className="font-medium text-gray-800">{volunteer.fullName}</div>
                       <div className="text-sm text-gray-500">{volunteer.occupation}</div>
+                      {volunteer.bloodGroup && (
+                        <div className="text-xs text-red-600 font-medium mt-1">
+                          Blood Group: {volunteer.bloodGroup}
+                          {volunteer.bloodDonor === 'yes' && ' (Donor)'}
+                        </div>
+                      )}
                     </div>
                   </td>
                   <td className="py-3 px-4">
                     <div className="flex flex-col space-y-1 text-sm">
                       <div className="flex items-center space-x-2">
                         <Mail className="w-4 h-4 text-gray-400" />
-                        <span className="text-gray-600">{volunteer.email}</span>
+                        <span className="text-gray-600 truncate max-w-32">{volunteer.email}</span>
                       </div>
                       <div className="flex items-center space-x-2">
                         <Phone className="w-4 h-4 text-gray-400" />
@@ -224,59 +365,56 @@ export default function VolunteerManagement() {
                     </div>
                   </td>
                   <td className="py-3 px-4 text-gray-600 text-sm">
-                    {volunteer.qualification}
+                    {volunteer.qualification || '-'}
                   </td>
                   <td className="py-3 px-4 text-gray-600 text-sm">
-                    {getSelectedInterests(volunteer)}
+                    <div className="max-w-48">
+                      {getSelectedInterests(volunteer)}
+                    </div>
                   </td>
-                  <td className="py-3 px-4 text-gray-600">
-                    {volunteer.bloodGroup || '-'}
+                  <td className="py-3 px-4 text-gray-600 text-sm">
+                    <div className="max-w-32">
+                      {getAvailability(volunteer)}
+                    </div>
                   </td>
                   <td className="py-3 px-4">
-                    <span className={`px-3 py-1 rounded-full text-xs font-semibold ${getStatusColor(volunteer.status)}`}>
-                      {volunteer.status}
-                    </span>
+                    <StatusBadge
+                      status={volunteer.status}
+                      volunteer={volunteer}
+                      onStatusChange={handleStatusChange}
+                    />
                   </td>
                   <td className="py-3 px-4">
                     <div className="flex items-center space-x-2">
+                      <QuickActionButtons
+                        volunteer={volunteer}
+                        onApprove={handleApprove}
+                        onReject={handleReject}
+                      />
                       <button
                         onClick={() => handleView(volunteer)}
-                        className="p-1 text-green-600 hover:bg-green-50 rounded"
-                        title="View"
+                        className="p-1.5 text-green-600 hover:bg-green-50 rounded-lg border border-green-200 transition-colors"
+                        title="View Details"
                       >
-                        <Eye className="w-5 h-5" />
+                        <Eye className="w-4 h-4" />
                       </button>
-                      {volunteer.status === 'pending' && (
-                        <>
-                          <button
-                            onClick={() => handleApprove(volunteer.id)}
-                            className="p-1 text-green-600 hover:bg-green-50 rounded"
-                            title="Approve"
-                          >
-                            <CheckCircle className="w-5 h-5" />
-                          </button>
-                          <button
-                            onClick={() => handleReject(volunteer.id)}
-                            className="p-1 text-red-600 hover:bg-red-50 rounded"
-                            title="Reject"
-                          >
-                            <XCircle className="w-5 h-5" />
-                          </button>
-                        </>
-                      )}
                       <button
                         onClick={() => handleEdit(volunteer)}
-                        className="p-1 text-blue-600 hover:bg-blue-50 rounded"
-                        title="Edit"
+                        className="p-1.5 text-blue-600 hover:bg-blue-50 rounded-lg border border-blue-200 transition-colors"
+                        title="Edit Volunteer"
                       >
-                        <Edit2 className="w-5 h-5" />
+                        <Edit2 className="w-4 h-4" />
                       </button>
                       <button
-                        onClick={() => deleteVolunteer(volunteer.id)}
-                        className="p-1 text-red-600 hover:bg-red-50 rounded"
-                        title="Delete"
+                        onClick={() => {
+                          if (window.confirm('Are you sure you want to delete this volunteer?')) {
+                            deleteVolunteer(volunteer.id);
+                          }
+                        }}
+                        className="p-1.5 text-red-600 hover:bg-red-50 rounded-lg border border-red-200 transition-colors"
+                        title="Delete Volunteer"
                       >
-                        <Trash2 className="w-5 h-5" />
+                        <Trash2 className="w-4 h-4" />
                       </button>
                     </div>
                   </td>
@@ -285,12 +423,19 @@ export default function VolunteerManagement() {
             </tbody>
           </table>
           {filteredVolunteers.length === 0 && (
-            <div className="text-center py-8 text-gray-500">No volunteers found</div>
+            <div className="text-center py-12 text-gray-500">
+              <div className="text-lg font-medium mb-2">No volunteers found</div>
+              <div className="text-sm">
+                {searchTerm || filterStatus !== 'all'
+                  ? 'Try adjusting your search or filter criteria'
+                  : 'Get started by adding your first volunteer'
+                }
+              </div>
+            </div>
           )}
         </div>
       </div>
 
-      {/* Add/Edit Modal */}
       {showModal && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
           <div className="bg-white rounded-xl max-w-4xl w-full max-h-[90vh] overflow-y-auto">
@@ -301,13 +446,12 @@ export default function VolunteerManagement() {
             </div>
 
             <form onSubmit={handleSubmit} className="p-6 space-y-6">
-              {/* Personal Details Section */}
               <div className="border-b border-gray-200 pb-6">
                 <h3 className="text-xl font-bold text-gray-800 mb-4">Personal Details</h3>
-                
+
                 <div className="space-y-4">
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">Name *</label>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">Full Name *</label>
                     <input
                       type="text"
                       value={formData.fullName}
@@ -464,10 +608,9 @@ export default function VolunteerManagement() {
                 </div>
               </div>
 
-              {/* Volunteer Preferences Section */}
               <div className="border-b border-gray-200 pb-6">
                 <h3 className="text-xl font-bold text-gray-800 mb-4">Volunteer Preferences</h3>
-                
+
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
                   <div>
                     <h4 className="font-semibold text-gray-700 mb-3">Areas of Interest:</h4>
@@ -517,7 +660,6 @@ export default function VolunteerManagement() {
                 </div>
               </div>
 
-              {/* Feedback & Suggestions */}
               <div className="border-b border-gray-200 pb-6">
                 <h3 className="text-xl font-bold text-gray-800 mb-4">Feedback & Suggestions</h3>
                 <div>
@@ -533,10 +675,9 @@ export default function VolunteerManagement() {
                 </div>
               </div>
 
-              {/* Admin Management Fields */}
               <div className="bg-gray-50 p-4 rounded-lg">
                 <h3 className="text-lg font-bold text-gray-800 mb-4">Administration</h3>
-                
+
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-2">Status</label>
@@ -548,6 +689,8 @@ export default function VolunteerManagement() {
                       <option value="pending">Pending</option>
                       <option value="approved">Approved</option>
                       <option value="rejected">Rejected</option>
+                      <option value="active">Active</option>
+                      <option value="inactive">Inactive</option>
                     </select>
                   </div>
                 </div>
@@ -584,7 +727,6 @@ export default function VolunteerManagement() {
         </div>
       )}
 
-      {/* View Modal */}
       {viewModal && (
         <ViewVolunteerModal
           volunteer={viewingVolunteer}

@@ -1,5 +1,5 @@
-import { useState, useMemo } from 'react';
-import { Plus, Search, Edit2, Trash2, Download, Mail, Calendar, ChevronDown, Eye } from 'lucide-react';
+import { useState, useMemo, useRef } from 'react';
+import { Plus, Search, Edit2, Trash2, Download, Mail, Calendar, ChevronDown, Eye, Share2 } from 'lucide-react';
 import { useData } from '../contexts/DataContext';
 import PDFPreviewModal from '../pages/PDFPreviewModal';
 import DonationReceiptPDF from '../pages/DonationReceiptPDF';
@@ -15,6 +15,8 @@ export default function DonationManagement() {
   const [filterYear, setFilterYear] = useState('all');
   const [filterMonth, setFilterMonth] = useState('all');
   const [showMonthFilter, setShowMonthFilter] = useState(false);
+  const [showShareMenu, setShowShareMenu] = useState(null);
+  const [isGeneratingPDF, setIsGeneratingPDF] = useState(false);
 
   const [formData, setFormData] = useState({
     donorName: '',
@@ -98,14 +100,146 @@ export default function DonationManagement() {
     setShowModal(true);
   };
 
-  const handleSendReceipt = (id) => {
-    updateDonation(id, { receiptSent: true });
-    alert('Receipt sent to donor email successfully!');
+  const handleSendReceipt = async (id) => {
+    const donation = donations.find(d => d.id === id);
+    if (donation) {
+      setIsGeneratingPDF(true);
+      try {
+        const pdfBlob = await DonationReceiptPDF.generatePDFBlob(donation);
+        await sharePDFViaEmail(pdfBlob, donation);
+        updateDonation(id, { receiptSent: true });
+        alert('Receipt sent to donor email successfully!');
+      } catch (error) {
+        console.error('Error sending receipt:', error);
+        alert('Error sending receipt. Please try again.');
+      } finally {
+        setIsGeneratingPDF(false);
+      }
+    }
   };
 
   const handlePreviewPDF = (donation) => {
     setPreviewDonation(donation);
     setShowPDFPreview(true);
+  };
+
+  const sharePDFViaWhatsApp = async (donation) => {
+    setIsGeneratingPDF(true);
+    try {
+      const pdfBlob = await DonationReceiptPDF.generatePDFBlob(donation);
+      const pdfFile = new File([pdfBlob], `Donation_Receipt_${donation.id}.pdf`, { 
+        type: 'application/pdf' 
+      });
+      
+      // Create a shareable message
+      const message = `🎉 *Donation Receipt*\n\n` +
+        `*Donor Name:* ${donation.donorName}\n` +
+        `*Amount:* ${donation.currency} ${Number(donation.amount).toLocaleString()}\n` +
+        `*Date:* ${new Date(donation.donationDate).toLocaleDateString()}\n` +
+        `*Transaction ID:* ${donation.transactionId || 'N/A'}\n\n` +
+        `Please find your donation receipt attached.\n` +
+        `🙏 *Thank you for your generous support!*`;
+      
+      // For mobile devices with Web Share API
+      if (navigator.share && navigator.canShare && navigator.canShare({ files: [pdfFile] })) {
+        await navigator.share({
+          title: 'Donation Receipt',
+          text: message,
+          files: [pdfFile],
+        });
+      } else {
+        // Fallback for desktop - download and suggest manual sharing
+        const url = window.URL.createObjectURL(pdfBlob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `Donation_Receipt_${donation.donorName}_${donation.id}.pdf`;
+        a.click();
+        window.URL.revokeObjectURL(url);
+        
+        // Show WhatsApp share link with message
+        const whatsappUrl = `https://wa.me/?text=${encodeURIComponent(message)}`;
+        window.open(whatsappUrl, '_blank');
+        alert('PDF downloaded. Please attach it manually to your WhatsApp message.');
+      }
+    } catch (error) {
+      console.error('Error sharing via WhatsApp:', error);
+      
+      // Fallback: Download PDF and show WhatsApp share
+      const pdfBlob = await DonationReceiptPDF.generatePDFBlob(donation);
+      const url = window.URL.createObjectURL(pdfBlob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `Donation_Receipt_${donation.donorName}_${donation.id}.pdf`;
+      a.click();
+      window.URL.revokeObjectURL(url);
+      
+      const message = `Donation Receipt for ${donation.donorName} - ${donation.currency} ${donation.amount}`;
+      const whatsappUrl = `https://wa.me/?text=${encodeURIComponent(message)}`;
+      window.open(whatsappUrl, '_blank');
+    } finally {
+      setIsGeneratingPDF(false);
+      setShowShareMenu(null);
+    }
+  };
+
+  const sharePDFViaEmail = async (pdfBlob, donation) => {
+    const subject = `Donation Receipt - ${donation.donorName}`;
+    const body = `Dear ${donation.donorName},\n\nThank you for your generous donation of ${donation.currency} ${Number(donation.amount).toLocaleString()}.\n\nPlease find your donation receipt attached.\n\nBest regards,\nShri Siddhivinayak Temple Trust`;
+    
+    const pdfFile = new File([pdfBlob], `Donation_Receipt_${donation.id}.pdf`, { 
+      type: 'application/pdf' 
+    });
+
+    if (navigator.share && navigator.canShare && navigator.canShare({ files: [pdfFile] })) {
+      await navigator.share({
+        title: subject,
+        text: body,
+        files: [pdfFile],
+      });
+    } else {
+      // Fallback for desktop email
+      const url = window.URL.createObjectURL(pdfBlob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `Donation_Receipt_${donation.donorName}_${donation.id}.pdf`;
+      a.click();
+      window.URL.revokeObjectURL(url);
+      
+      const mailtoUrl = `mailto:${donation.donorEmail}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
+      window.location.href = mailtoUrl;
+    }
+  };
+
+  const handleSharePDF = async (donation, platform) => {
+    setIsGeneratingPDF(true);
+    try {
+      const pdfBlob = await DonationReceiptPDF.generatePDFBlob(donation);
+      
+      switch (platform) {
+        case 'whatsapp':
+          await sharePDFViaWhatsApp(donation);
+          break;
+        case 'email':
+          await sharePDFViaEmail(pdfBlob, donation);
+          break;
+        case 'download':
+          const url = window.URL.createObjectURL(pdfBlob);
+          const a = document.createElement('a');
+          a.href = url;
+          a.download = `Donation_Receipt_${donation.donorName}_${donation.id}.pdf`;
+          a.click();
+          window.URL.revokeObjectURL(url);
+          break;
+        default:
+          break;
+      }
+    } catch (error) {
+      console.error('Error sharing PDF:', error);
+      alert('Error sharing PDF. Please try again.');
+    } finally {
+      setIsGeneratingPDF(false);
+      setShowShareMenu(null);
+    }
   };
 
   const filteredDonations = donations.filter(donation => {
@@ -174,13 +308,15 @@ export default function DonationManagement() {
       Date: new Date(d.donationDate).toLocaleDateString(),
       Donor: d.donorName,
       Email: d.donorEmail,
+      Phone: d.donorPhone || '-',
       PAN: d.panNumber || '-',
       Amount: d.amount,
       Currency: d.currency,
       Type: d.type,
       Purpose: d.purpose,
       Status: d.status,
-      TransactionID: d.transactionId
+      TransactionID: d.transactionId,
+      PaymentGateway: d.paymentGateway
     }));
 
     const csv = [
@@ -374,6 +510,9 @@ export default function DonationManagement() {
                     <div>
                       <div className="font-medium text-gray-800">{donation.donorName}</div>
                       <div className="text-sm text-gray-500">{donation.donorEmail}</div>
+                      {donation.donorPhone && (
+                        <div className="text-sm text-gray-500">{donation.donorPhone}</div>
+                      )}
                     </div>
                   </td>
                   <td className="py-3 px-4 text-sm text-gray-600">
@@ -409,18 +548,76 @@ export default function DonationManagement() {
                       >
                         <Eye className="w-5 h-5" />
                       </button>
+                      
+                      <div className="relative">
+                        <button
+                          onClick={() => setShowShareMenu(showShareMenu === donation.id ? null : donation.id)}
+                          className="p-1 text-green-600 hover:bg-green-50 rounded disabled:opacity-50"
+                          title="Share Receipt"
+                          disabled={isGeneratingPDF}
+                        >
+                          <Share2 className="w-5 h-5" />
+                        </button>
+
+                        {showShareMenu === donation.id && (
+                          <div className="absolute top-full right-0 mt-1 bg-white border border-gray-200 rounded-lg shadow-lg z-20 min-w-48">
+                            <div className="p-2">
+                              <div className="text-xs font-medium text-gray-500 mb-2 px-2">Share PDF via:</div>
+                              <button
+                                onClick={() => handleSharePDF(donation, 'whatsapp')}
+                                className="w-full text-left px-3 py-2 text-sm text-green-600 hover:bg-green-50 rounded flex items-center space-x-2 disabled:opacity-50"
+                                disabled={isGeneratingPDF}
+                              >
+                                {isGeneratingPDF ? (
+                                  <span>Generating PDF...</span>
+                                ) : (
+                                  <span>WhatsApp</span>
+                                )}
+                              </button>
+                              <button
+                                onClick={() => handleSharePDF(donation, 'email')}
+                                className="w-full text-left px-3 py-2 text-sm text-blue-600 hover:bg-blue-50 rounded flex items-center space-x-2 disabled:opacity-50"
+                                disabled={isGeneratingPDF}
+                              >
+                                {isGeneratingPDF ? (
+                                  <span>Generating PDF...</span>
+                                ) : (
+                                  <span>Email</span>
+                                )}
+                              </button>
+                              <button
+                                onClick={() => handleSharePDF(donation, 'download')}
+                                className="w-full text-left px-3 py-2 text-sm text-gray-600 hover:bg-gray-50 rounded flex items-center space-x-2 disabled:opacity-50"
+                                disabled={isGeneratingPDF}
+                              >
+                                {isGeneratingPDF ? (
+                                  <span>Generating PDF...</span>
+                                ) : (
+                                  <span>Download PDF</span>
+                                )}
+                              </button>
+                            </div>
+                          </div>
+                        )}
+                      </div>
+
                       {!donation.receiptSent && (
                         <button
                           onClick={() => handleSendReceipt(donation.id)}
-                          className="p-1 text-green-600 hover:bg-green-50 rounded"
+                          className="p-1 text-blue-600 hover:bg-blue-50 rounded disabled:opacity-50"
                           title="Send Receipt"
+                          disabled={isGeneratingPDF}
                         >
-                          <Mail className="w-5 h-5" />
+                          {isGeneratingPDF ? (
+                            <span className="animate-spin">⏳</span>
+                          ) : (
+                            <Mail className="w-5 h-5" />
+                          )}
                         </button>
                       )}
                       <button
                         onClick={() => handleEdit(donation)}
-                        className="p-1 text-blue-600 hover:bg-blue-50 rounded"
+                        className="p-1 text-orange-600 hover:bg-orange-50 rounded"
                         title="Edit"
                       >
                         <Edit2 className="w-5 h-5" />
@@ -486,6 +683,7 @@ export default function DonationManagement() {
                     value={formData.donorPhone}
                     onChange={(e) => setFormData({ ...formData, donorPhone: e.target.value })}
                     className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-900 focus:border-transparent outline-none"
+                    placeholder="+91 9876543210"
                   />
                 </div>
 
@@ -586,7 +784,7 @@ export default function DonationManagement() {
                     onChange={(e) => setFormData({ ...formData, purpose: e.target.value })}
                     rows="2"
                     className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-900 focus:border-transparent outline-none"
-                    placeholder="e.g., Temple construction, Medical aid"
+                    placeholder="e.g., Temple construction, Medical aid, Education fund"
                   ></textarea>
                 </div>
               </div>
@@ -616,7 +814,8 @@ export default function DonationManagement() {
           donation={previewDonation}
           isOpen={showPDFPreview}
           onClose={() => setShowPDFPreview(false)}
-          onDownload={() => DonationReceiptPDF.generatePDF(previewDonation)}
+          onDownload={() => handleSharePDF(previewDonation, 'download')}
+          onShare={(platform) => handleSharePDF(previewDonation, platform)}
         />
       )}
     </div>
