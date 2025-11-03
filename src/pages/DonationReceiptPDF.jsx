@@ -28,12 +28,12 @@ export default class DonationReceiptPDF {
         doc.setTextColor(0, 0, 0);
         doc.setFontSize(10);
         doc.setFont('helvetica', 'bold');
-        doc.text('Shri Siddhivinayak Temple Trust', margin, yPosition);
+        doc.text('Maha Shree Rudra Samsthanam Foundation', margin, yPosition);
         
         doc.setFontSize(8);
         doc.setFont('helvetica', 'normal');
         yPosition += 6;
-        doc.text('123 Temple Road, Mumbai, Maharashtra - 400001', margin, yPosition);
+        doc.text('Registered Non-Profit Organization', margin, yPosition);
         yPosition += 4;
         doc.text('PAN: AAAAA1234A | Trust Registration No: E-12345', margin, yPosition);
         yPosition += 4;
@@ -46,7 +46,7 @@ export default class DonationReceiptPDF {
         yPosition += 6;
         
         const receiptDetails = [
-          { label: 'Receipt No:', value: `RC-${donation.id.slice(-6)}` },
+          { label: 'Receipt No:', value: `REC-${donation.id}-${new Date().getFullYear()}` },
           { label: 'Date:', value: new Date(donation.donationDate).toLocaleDateString() },
           { label: 'Transaction ID:', value: donation.transactionId || 'N/A' },
           { label: 'Payment Method:', value: donation.paymentGateway },
@@ -141,6 +141,17 @@ export default class DonationReceiptPDF {
         
         yPosition += 30;
         
+        // Thank You Message
+        doc.setTextColor(30, 64, 175);
+        doc.setFontSize(10);
+        doc.setFont('helvetica', 'bold');
+        doc.text('Thank you for your generous donation!', pageWidth / 2, yPosition, { align: 'center' });
+        doc.setFont('helvetica', 'normal');
+        doc.setFontSize(8);
+        doc.text('Your contribution helps us continue our mission and make a difference.', pageWidth / 2, yPosition + 5, { align: 'center' });
+        
+        yPosition += 15;
+        
         // Footer
         doc.setDrawColor(200, 200, 200);
         doc.line(margin, yPosition, pageWidth - margin, yPosition);
@@ -158,12 +169,21 @@ export default class DonationReceiptPDF {
         
         yPosition += 15;
         
+        // Authorized Signatory Details
+        doc.setFont('helvetica', 'bold');
+        doc.text('Srinivasa Sai', margin + 25, yPosition);
+        doc.setFont('helvetica', 'normal');
+        doc.setFontSize(7);
+        doc.text('Founder, Maha Shree Rudra Foundation', margin + 25, yPosition + 4);
+        
+        yPosition += 10;
+        
         // Contact Info
         doc.setFontSize(7);
         doc.setTextColor(100, 100, 100);
         doc.text('This is a computer-generated receipt. No physical signature is required.', pageWidth / 2, yPosition, { align: 'center' });
         yPosition += 4;
-        doc.text('For any queries, please contact: support@templetrust.org | Phone: +91-22-12345678', pageWidth / 2, yPosition, { align: 'center' });
+        doc.text('Generated on ' + new Date().toLocaleDateString() + ' at ' + new Date().toLocaleTimeString(), pageWidth / 2, yPosition, { align: 'center' });
         
         // Generate blob
         const pdfBlob = doc.output('blob');

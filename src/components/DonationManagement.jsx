@@ -30,7 +30,8 @@ export default function DonationManagement() {
     paymentGateway: 'Razorpay',
     transactionId: '',
     status: 'completed',
-    receiptSent: false
+    receiptSent: false,
+    donationDate: new Date().toISOString().split('T')[0]
   });
 
   const { availableYears, availableMonths } = useMemo(() => {
@@ -88,7 +89,8 @@ export default function DonationManagement() {
       paymentGateway: 'Razorpay',
       transactionId: '',
       status: 'completed',
-      receiptSent: false
+      receiptSent: false,
+      donationDate: new Date().toISOString().split('T')[0]
     });
     setEditingDonation(null);
     setShowModal(false);
@@ -96,7 +98,10 @@ export default function DonationManagement() {
 
   const handleEdit = (donation) => {
     setEditingDonation(donation);
-    setFormData({ ...donation });
+    setFormData({ 
+      ...donation,
+      donationDate: donation.donationDate.split('T')[0]
+    });
     setShowModal(true);
   };
 
@@ -727,6 +732,17 @@ export default function DonationManagement() {
                 </div>
 
                 <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">Donation Date</label>
+                  <input
+                    type="date"
+                    value={formData.donationDate}
+                    onChange={(e) => setFormData({ ...formData, donationDate: e.target.value })}
+                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-900 focus:border-transparent outline-none"
+                    required
+                  />
+                </div>
+
+                <div>
                   <label className="block text-sm font-medium text-gray-700 mb-2">Type</label>
                   <select
                     value={formData.type}
@@ -816,6 +832,7 @@ export default function DonationManagement() {
           onClose={() => setShowPDFPreview(false)}
           onDownload={() => handleSharePDF(previewDonation, 'download')}
           onShare={(platform) => handleSharePDF(previewDonation, platform)}
+          isGeneratingPDF={isGeneratingPDF}
         />
       )}
     </div>
