@@ -1,6 +1,7 @@
 import { useState, useMemo } from 'react';
-import { Plus, Search, Edit2, Trash2, Download, Mail, Calendar, ChevronDown } from 'lucide-react';
+import { Plus, Search, Edit2, Trash2, Download, Mail, Calendar, ChevronDown, FileText } from 'lucide-react';
 import { useData } from '../contexts/DataContext';
+import DonationReceiptPDF from '../pages/DonationReceiptPDF';
 
 export default function DonationManagement() {
   const { donations, addDonation, updateDonation, deleteDonation } = useData();
@@ -100,6 +101,10 @@ export default function DonationManagement() {
   const handleSendReceipt = (id) => {
     updateDonation(id, { receiptSent: true });
     alert('Receipt sent to donor email successfully!');
+  };
+
+  const handleDownloadPDF = (donation) => {
+    DonationReceiptPDF.generatePDF(donation);
   };
 
   const filteredDonations = donations.filter(donation => {
@@ -208,7 +213,7 @@ export default function DonationManagement() {
             className="bg-green-600 text-white px-6 py-3 rounded-lg flex items-center space-x-2 hover:bg-green-700 transition-colors"
           >
             <Download className="w-5 h-5" />
-            <span>Export</span>
+            <span>Export CSV</span>
           </button>
           <button
             onClick={() => setShowModal(true)}
@@ -407,6 +412,13 @@ export default function DonationManagement() {
                   </td>
                   <td className="py-3 px-4">
                     <div className="flex items-center space-x-2">
+                      <button
+                        onClick={() => handleDownloadPDF(donation)}
+                        className="p-1 text-purple-600 hover:bg-purple-50 rounded"
+                        title="Download Receipt PDF"
+                      >
+                        <FileText className="w-5 h-5" />
+                      </button>
                       {!donation.receiptSent && (
                         <button
                           onClick={() => handleSendReceipt(donation.id)}
