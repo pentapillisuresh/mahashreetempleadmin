@@ -34,6 +34,21 @@ export default function DonationManagement() {
     donationDate: new Date().toISOString().split('T')[0]
   });
 
+  // Purpose dropdown options - 11 services
+  const purposeOptions = [
+    'Temple Activities',
+    'Annaprasadham',
+    'Education Support',
+    'Goshala Seva',
+    'Indian Culture Development',
+    'Infrastructure Progression',
+    'Medical Assistance',
+    'Sanathana Sangeetham',
+    'Social Welfare Drives',
+    'Vedic Sanskrit',
+    'Yoga Wellbeing'
+  ];
+
   const { availableYears, availableMonths } = useMemo(() => {
     const yearsSet = new Set();
     const monthsMap = new Map();
@@ -795,13 +810,28 @@ export default function DonationManagement() {
 
                 <div className="sm:col-span-2">
                   <label className="block text-sm font-medium text-gray-700 mb-2">Purpose</label>
-                  <textarea
+                  <select
                     value={formData.purpose}
                     onChange={(e) => setFormData({ ...formData, purpose: e.target.value })}
-                    rows="2"
                     className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-900 focus:border-transparent outline-none"
-                    placeholder="e.g., Temple construction, Medical aid, Education fund"
-                  ></textarea>
+                  >
+                    <option value="">Select Purpose</option>
+                    {purposeOptions.map((purpose, index) => (
+                      <option key={index} value={purpose}>
+                        {purpose}
+                      </option>
+                    ))}
+                    <option value="other">Other</option>
+                  </select>
+                  {formData.purpose === 'other' && (
+                    <input
+                      type="text"
+                      value={formData.purpose}
+                      onChange={(e) => setFormData({ ...formData, purpose: e.target.value })}
+                      className="w-full mt-2 px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-900 focus:border-transparent outline-none"
+                      placeholder="Enter custom purpose"
+                    />
+                  )}
                 </div>
               </div>
 
