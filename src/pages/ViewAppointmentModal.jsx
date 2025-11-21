@@ -4,23 +4,28 @@ export default function ViewAppointmentModal({ appointment, onClose }) {
   if (!appointment) return null;
 
   const getSelectedServices = () => {
-    const services = [];
-    if (appointment.astrologyConsultation) services.push('Astrology Consultation');
-    if (appointment.intiVashiu) services.push('Inti Vashiu (House Vastu Consultation)');
-    if (appointment.poojas) services.push('Poojas (Lakshmi Pooja, Rudrabhishekam, Satyanarayana Vratam)');
-    if (appointment.namingCeremony) services.push('Naming Ceremony');
-    if (appointment.horoscopeMatching) services.push('Horoscope Matching (Pellilu / Marriages)');
-    if (appointment.grihaPravesham) services.push('Griha Pravesham (House Warming Ceremony)');
-    if (appointment.homamsYagnams) services.push('Homams / Yagnams');
-    if (appointment.templeRituals) services.push('Temple Rituals');
-    if (appointment.otherService && appointment.otherServiceText) services.push(appointment.otherServiceText);
+    if (!appointment.serviceRequired) return [];
+    
+    // Handle serviceRequired from backend (could be array or JSON string)
+    let services = [];
+    
+    if (Array.isArray(appointment.serviceRequired)) {
+      services = appointment.serviceRequired;
+    } else if (typeof appointment.serviceRequired === 'string') {
+      try {
+        services = JSON.parse(appointment.serviceRequired);
+      } catch {
+        // If it's not valid JSON, use it as a single service
+        services = [appointment.serviceRequired];
+      }
+    }
+    
     return services;
   };
 
   const getStatusColor = (status) => {
     switch (status) {
-      case 'approved': return 'bg-green-100 text-green-800';
-      case 'scheduled': return 'bg-blue-100 text-blue-800';
+      case 'confirmed': return 'bg-green-100 text-green-800';
       case 'completed': return 'bg-gray-100 text-gray-800';
       case 'cancelled': return 'bg-red-100 text-red-800';
       default: return 'bg-yellow-100 text-yellow-800';
@@ -62,6 +67,11 @@ export default function ViewAppointmentModal({ appointment, onClose }) {
               </div>
               
               <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Time of Birth</label>
+                <p className="text-gray-900">{appointment.timeOfBirth || 'Not provided'}</p>
+              </div>
+              
+              <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">Age</label>
                 <p className="text-gray-900">{appointment.age || 'Not provided'}</p>
               </div>
@@ -92,7 +102,7 @@ export default function ViewAppointmentModal({ appointment, onClose }) {
                   <Mail className="w-4 h-4 mr-1" />
                   Email
                 </label>
-                <p className="text-gray-900">{appointment.email}</p>
+                <p className="text-gray-900">{appointment.emailAddress}</p>
               </div>
               
               <div className="md:col-span-2">
@@ -130,7 +140,7 @@ export default function ViewAppointmentModal({ appointment, onClose }) {
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">Date</label>
-                <p className="text-gray-900">{appointment.preferredDate || 'Not specified'}</p>
+                <p className="text-gray-900">{appointment.preferredAppointmentDate || 'Not specified'}</p>
               </div>
               
               <div>
@@ -138,7 +148,7 @@ export default function ViewAppointmentModal({ appointment, onClose }) {
                   <Clock className="w-4 h-4 mr-1" />
                   Time
                 </label>
-                <p className="text-gray-900">{appointment.preferredTime || 'Not specified'}</p>
+                <p className="text-gray-900">{appointment.preferredAppointmentTime || 'Not specified'}</p>
               </div>
             </div>
           </div>
@@ -152,79 +162,60 @@ export default function ViewAppointmentModal({ appointment, onClose }) {
             
             <div className="space-y-4">
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Requirements Description</label>
-                <p className="text-gray-900 whitespace-pre-line">{appointment.requirements || 'Not provided'}</p>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Detailed Requirements</label>
+                <p className="text-gray-900 whitespace-pre-line">{appointment.detailedRequirements || 'Not provided'}</p>
               </div>
               
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1 flex items-center">
-                    <Users className="w-4 h-4 mr-1" />
-                    Attendees Count
-                  </label>
-                  <p className="text-gray-900">{appointment.attendeesCount || 'Not specified'}</p>
-                </div>
-                
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Location</label>
-                  <p className="text-gray-900 capitalize">{appointment.location || 'Not specified'}</p>
-                </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1 flex items-center">
+                  <Users className="w-4 h-4 mr-1" />
+                  Number of Attendees
+                </label>
+                <p className="text-gray-900">{appointment.numberOfAttendees || 'Not specified'}</p>
               </div>
             </div>
           </div>
 
-          {/* Declaration */}
-          <div className="border-b border-gray-200 pb-6">
-            <h3 className="text-xl font-bold text-gray-800 mb-4">Declaration</h3>
-            
-            <div className="bg-gray-50 p-4 rounded-lg">
-              <p className="text-gray-700 mb-3">
-                I confirm that the above details are true and accurate. I request to book an appointment for the mentioned service and understand that the final confirmation will be provided by the temple administration.
-              </p>
-              
-              <div className="flex items-center space-x-2">
-                <div className={`w-3 h-3 rounded-full ${appointment.declarationAccepted ? 'bg-green-500' : 'bg-red-500'}`}></div>
-                <span className="text-gray-700 font-medium">
-                  {appointment.declarationAccepted ? 'Declaration Accepted' : 'Declaration Not Accepted'}
-                </span>
-              </div>
-            </div>
-          </div>
-
-          {/* Admin Information */}
+          {/* Status Information */}
           <div className="bg-gray-50 p-4 rounded-lg">
-            <h3 className="text-lg font-bold text-gray-800 mb-4">Administration Information</h3>
+            <h3 className="text-lg font-bold text-gray-800 mb-4">Appointment Status</h3>
             
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">Status</label>
                 <span className={`px-3 py-1 rounded-full text-xs font-semibold ${getStatusColor(appointment.status)}`}>
-                  {appointment.status}
+                  {appointment.status || 'pending'}
                 </span>
               </div>
               
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Payment Status</label>
-                <span className={`px-3 py-1 rounded-full text-xs font-semibold ${
-                  appointment.paymentStatus === 'paid' ? 'bg-green-100 text-green-800' : 'bg-yellow-100 text-yellow-800'
-                }`}>
-                  {appointment.paymentStatus}
-                </span>
-              </div>
-              
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Payment Amount</label>
-                <p className="text-gray-900 font-medium">₹{appointment.paymentAmount || 0}</p>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Number of Attendees</label>
+                <p className="text-gray-900 font-medium">{appointment.numberOfAttendees || 1}</p>
               </div>
             </div>
-            
-            {appointment.adminNotes && (
-              <div className="mt-4">
-                <label className="block text-sm font-medium text-gray-700 mb-1">Admin Notes</label>
-                <p className="text-gray-900 whitespace-pre-line bg-white p-3 rounded border">{appointment.adminNotes}</p>
-              </div>
-            )}
           </div>
+
+          {/* Timestamps */}
+          {(appointment.createdAt || appointment.updatedAt) && (
+            <div className="border-t border-gray-200 pt-6">
+              <h3 className="text-lg font-bold text-gray-800 mb-4">Timestamps</h3>
+              
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                {appointment.createdAt && (
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">Created At</label>
+                    <p className="text-gray-900">{new Date(appointment.createdAt).toLocaleString()}</p>
+                  </div>
+                )}
+                {appointment.updatedAt && (
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">Updated At</label>
+                    <p className="text-gray-900">{new Date(appointment.updatedAt).toLocaleString()}</p>
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
 
           <div className="flex justify-end pt-4">
             <button

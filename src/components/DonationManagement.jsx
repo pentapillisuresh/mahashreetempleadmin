@@ -1,11 +1,19 @@
-import { useState, useMemo, useRef } from 'react';
-import { Plus, Search, Edit2, Trash2, Download, Mail, Calendar, ChevronDown, Eye, Share2 } from 'lucide-react';
+import { useState, useMemo, useRef, useEffect } from 'react';
+import { Plus, Search, Edit2, Trash2, Download, Mail, Calendar, ChevronDown, Eye, Share2, Loader2 } from 'lucide-react';
 import { useData } from '../contexts/DataContext';
 import PDFPreviewModal from '../pages/PDFPreviewModal';
 import DonationReceiptPDF from '../pages/DonationReceiptPDF';
 
 export default function DonationManagement() {
-  const { donations, addDonation, updateDonation, deleteDonation } = useData();
+  const { 
+    donations, 
+    addDonation, 
+    updateDonation, 
+    deleteDonation, 
+    loadDonationsFromAPI,
+    loading 
+  } = useData();
+  
   const [showModal, setShowModal] = useState(false);
   const [showPDFPreview, setShowPDFPreview] = useState(false);
   const [previewDonation, setPreviewDonation] = useState(null);
@@ -17,6 +25,8 @@ export default function DonationManagement() {
   const [showMonthFilter, setShowMonthFilter] = useState(false);
   const [showShareMenu, setShowShareMenu] = useState(null);
   const [isGeneratingPDF, setIsGeneratingPDF] = useState(false);
+  const [submitLoading, setSubmitLoading] = useState(false);
+  const [actionLoading, setActionLoading] = useState(null);
 
   const [formData, setFormData] = useState({
     donorName: '',
@@ -31,7 +41,8 @@ export default function DonationManagement() {
     transactionId: '',
     status: 'completed',
     receiptSent: false,
-    donationDate: new Date().toISOString().split('T')[0]
+    donationDate: new Date().toISOString().split('T')[0],
+    donorAddress: ''
   });
 
   // Purpose dropdown options - 11 services
@@ -48,6 +59,11 @@ export default function DonationManagement() {
     'Vedic Sanskrit',
     'Yoga Wellbeing'
   ];
+
+  // Load donations on component mount
+  useEffect(() => {
+    loadDonationsFromAPI();
+  }, [loadDonationsFromAPI]);
 
   const { availableYears, availableMonths } = useMemo(() => {
     const yearsSet = new Set();
@@ -81,14 +97,23 @@ export default function DonationManagement() {
     return availableMonths.get(year) || [];
   };
 
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
-    if (editingDonation) {
-      updateDonation(editingDonation.id, formData);
-    } else {
-      addDonation(formData);
+    setSubmitLoading(true);
+    
+    try {
+      if (editingDonation) {
+        await updateDonation(editingDonation.id, formData);
+      } else {
+        await addDonation(formData);
+      }
+      resetForm();
+    } catch (error) {
+      console.error('Error submitting donation:', error);
+      alert(`Error: ${error.message}`);
+    } finally {
+      setSubmitLoading(false);
     }
-    resetForm();
   };
 
   const resetForm = () => {
@@ -105,7 +130,8 @@ export default function DonationManagement() {
       transactionId: '',
       status: 'completed',
       receiptSent: false,
-      donationDate: new Date().toISOString().split('T')[0]
+      donationDate: new Date().toISOString().split('T')[0],
+      donorAddress: ''
     });
     setEditingDonation(null);
     setShowModal(false);
@@ -115,9 +141,26 @@ export default function DonationManagement() {
     setEditingDonation(donation);
     setFormData({ 
       ...donation,
-      donationDate: donation.donationDate.split('T')[0]
+      donationDate: donation.donationDate ? donation.donationDate.split('T')[0] : new Date().toISOString().split('T')[0]
     });
     setShowModal(true);
+  };
+
+  const handleDelete = async (id) => {
+    if (!window.confirm('Are you sure you want to delete this donation?')) {
+      return;
+    }
+
+    setActionLoading(id);
+    try {
+      await deleteDonation(id);
+      alert('Donation deleted successfully!');
+    } catch (error) {
+      console.error('Error deleting donation:', error);
+      alert(`Error: ${error.message}`);
+    } finally {
+      setActionLoading(null);
+    }
   };
 
   const handleSendReceipt = async (id) => {
@@ -127,7 +170,7 @@ export default function DonationManagement() {
       try {
         const pdfBlob = await DonationReceiptPDF.generatePDFBlob(donation);
         await sharePDFViaEmail(pdfBlob, donation);
-        updateDonation(id, { receiptSent: true });
+        await updateDonation(id, { receiptSent: true });
         alert('Receipt sent to donor email successfully!');
       } catch (error) {
         console.error('Error sending receipt:', error);
@@ -507,158 +550,172 @@ export default function DonationManagement() {
         </div>
 
         <div className="overflow-x-auto">
-          <table className="w-full">
-            <thead>
-              <tr className="bg-gray-50 border-b border-gray-200">
-                <th className="text-left py-3 px-4 font-semibold text-gray-700">Date</th>
-                <th className="text-left py-3 px-4 font-semibold text-gray-700">Donor</th>
-                <th className="text-left py-3 px-4 font-semibold text-gray-700">PAN</th>
-                <th className="text-left py-3 px-4 font-semibold text-gray-700">Amount</th>
-                <th className="text-left py-3 px-4 font-semibold text-gray-700">Type</th>
-                <th className="text-left py-3 px-4 font-semibold text-gray-700">Purpose</th>
-                <th className="text-left py-3 px-4 font-semibold text-gray-700">Status</th>
-                <th className="text-left py-3 px-4 font-semibold text-gray-700">Actions</th>
-              </tr>
-            </thead>
-            <tbody>
-              {filteredDonations.map((donation) => (
-                <tr key={donation.id} className="border-b border-gray-100 hover:bg-gray-50">
-                  <td className="py-3 px-4 text-sm text-gray-600">
-                    {new Date(donation.donationDate).toLocaleDateString()}
-                  </td>
-                  <td className="py-3 px-4">
-                    <div>
-                      <div className="font-medium text-gray-800">{donation.donorName}</div>
-                      <div className="text-sm text-gray-500">{donation.donorEmail}</div>
-                      {donation.donorPhone && (
-                        <div className="text-sm text-gray-500">{donation.donorPhone}</div>
-                      )}
-                    </div>
-                  </td>
-                  <td className="py-3 px-4 text-sm text-gray-600">
-                    {donation.panNumber || '-'}
-                  </td>
-                  <td className="py-3 px-4">
-                    <div className="font-semibold text-gray-800">
-                      {donation.currency} {Number(donation.amount).toLocaleString()}
-                    </div>
-                  </td>
-                  <td className="py-3 px-4">
-                    <span className={`px-3 py-1 rounded-full text-xs font-semibold ${
-                      donation.type === 'domestic' ? 'bg-green-100 text-green-800' : 'bg-blue-100 text-blue-800'
-                    }`}>
-                      {donation.type}
-                    </span>
-                  </td>
-                  <td className="py-3 px-4 text-gray-600">{donation.purpose || '-'}</td>
-                  <td className="py-3 px-4">
-                    <span className={`px-3 py-1 rounded-full text-xs font-semibold ${
-                      donation.status === 'completed' ? 'bg-green-100 text-green-800' :
-                      donation.status === 'pending' ? 'bg-yellow-100 text-yellow-800' : 'bg-red-100 text-red-800'
-                    }`}>
-                      {donation.status}
-                    </span>
-                  </td>
-                  <td className="py-3 px-4">
-                    <div className="flex items-center space-x-2">
-                      <button
-                        onClick={() => handlePreviewPDF(donation)}
-                        className="p-1 text-purple-600 hover:bg-purple-50 rounded"
-                        title="Preview & Download Receipt"
-                      >
-                        <Eye className="w-5 h-5" />
-                      </button>
-                      
-                      <div className="relative">
-                        <button
-                          onClick={() => setShowShareMenu(showShareMenu === donation.id ? null : donation.id)}
-                          className="p-1 text-green-600 hover:bg-green-50 rounded disabled:opacity-50"
-                          title="Share Receipt"
-                          disabled={isGeneratingPDF}
-                        >
-                          <Share2 className="w-5 h-5" />
-                        </button>
-
-                        {showShareMenu === donation.id && (
-                          <div className="absolute top-full right-0 mt-1 bg-white border border-gray-200 rounded-lg shadow-lg z-20 min-w-48">
-                            <div className="p-2">
-                              <div className="text-xs font-medium text-gray-500 mb-2 px-2">Share PDF via:</div>
-                              <button
-                                onClick={() => handleSharePDF(donation, 'whatsapp')}
-                                className="w-full text-left px-3 py-2 text-sm text-green-600 hover:bg-green-50 rounded flex items-center space-x-2 disabled:opacity-50"
-                                disabled={isGeneratingPDF}
-                              >
-                                {isGeneratingPDF ? (
-                                  <span>Generating PDF...</span>
-                                ) : (
-                                  <span>WhatsApp</span>
-                                )}
-                              </button>
-                              <button
-                                onClick={() => handleSharePDF(donation, 'email')}
-                                className="w-full text-left px-3 py-2 text-sm text-blue-600 hover:bg-blue-50 rounded flex items-center space-x-2 disabled:opacity-50"
-                                disabled={isGeneratingPDF}
-                              >
-                                {isGeneratingPDF ? (
-                                  <span>Generating PDF...</span>
-                                ) : (
-                                  <span>Email</span>
-                                )}
-                              </button>
-                              <button
-                                onClick={() => handleSharePDF(donation, 'download')}
-                                className="w-full text-left px-3 py-2 text-sm text-gray-600 hover:bg-gray-50 rounded flex items-center space-x-2 disabled:opacity-50"
-                                disabled={isGeneratingPDF}
-                              >
-                                {isGeneratingPDF ? (
-                                  <span>Generating PDF...</span>
-                                ) : (
-                                  <span>Download PDF</span>
-                                )}
-                              </button>
-                            </div>
-                          </div>
-                        )}
-                      </div>
-
-                      {!donation.receiptSent && (
-                        <button
-                          onClick={() => handleSendReceipt(donation.id)}
-                          className="p-1 text-blue-600 hover:bg-blue-50 rounded disabled:opacity-50"
-                          title="Send Receipt"
-                          disabled={isGeneratingPDF}
-                        >
-                          {isGeneratingPDF ? (
-                            <span className="animate-spin">⏳</span>
-                          ) : (
-                            <Mail className="w-5 h-5" />
-                          )}
-                        </button>
-                      )}
-                      <button
-                        onClick={() => handleEdit(donation)}
-                        className="p-1 text-orange-600 hover:bg-orange-50 rounded"
-                        title="Edit"
-                      >
-                        <Edit2 className="w-5 h-5" />
-                      </button>
-                      <button
-                        onClick={() => deleteDonation(donation.id)}
-                        className="p-1 text-red-600 hover:bg-red-50 rounded"
-                        title="Delete"
-                      >
-                        <Trash2 className="w-5 h-5" />
-                      </button>
-                    </div>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-          {filteredDonations.length === 0 && (
-            <div className="text-center py-8 text-gray-500">
-              No donations found for the selected filters
+          {loading && donations.length === 0 ? (
+            <div className="text-center py-8">
+              <Loader2 className="w-8 h-8 animate-spin mx-auto text-blue-900" />
+              <p className="text-gray-600 mt-2">Loading donations...</p>
             </div>
+          ) : (
+            <>
+              <table className="w-full">
+                <thead>
+                  <tr className="bg-gray-50 border-b border-gray-200">
+                    <th className="text-left py-3 px-4 font-semibold text-gray-700">Date</th>
+                    <th className="text-left py-3 px-4 font-semibold text-gray-700">Donor</th>
+                    <th className="text-left py-3 px-4 font-semibold text-gray-700">PAN</th>
+                    <th className="text-left py-3 px-4 font-semibold text-gray-700">Amount</th>
+                    <th className="text-left py-3 px-4 font-semibold text-gray-700">Type</th>
+                    <th className="text-left py-3 px-4 font-semibold text-gray-700">Purpose</th>
+                    <th className="text-left py-3 px-4 font-semibold text-gray-700">Status</th>
+                    <th className="text-left py-3 px-4 font-semibold text-gray-700">Actions</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {filteredDonations.map((donation) => (
+                    <tr key={donation.id} className="border-b border-gray-100 hover:bg-gray-50">
+                      <td className="py-3 px-4 text-sm text-gray-600">
+                        {new Date(donation.donationDate).toLocaleDateString()}
+                      </td>
+                      <td className="py-3 px-4">
+                        <div>
+                          <div className="font-medium text-gray-800">{donation.donorName}</div>
+                          <div className="text-sm text-gray-500">{donation.donorEmail}</div>
+                          {donation.donorPhone && (
+                            <div className="text-sm text-gray-500">{donation.donorPhone}</div>
+                          )}
+                        </div>
+                      </td>
+                      <td className="py-3 px-4 text-sm text-gray-600">
+                        {donation.panNumber || '-'}
+                      </td>
+                      <td className="py-3 px-4">
+                        <div className="font-semibold text-gray-800">
+                          {donation.currency} {Number(donation.amount).toLocaleString()}
+                        </div>
+                      </td>
+                      <td className="py-3 px-4">
+                        <span className={`px-3 py-1 rounded-full text-xs font-semibold ${
+                          donation.type === 'domestic' ? 'bg-green-100 text-green-800' : 'bg-blue-100 text-blue-800'
+                        }`}>
+                          {donation.type}
+                        </span>
+                      </td>
+                      <td className="py-3 px-4 text-gray-600">{donation.purpose || '-'}</td>
+                      <td className="py-3 px-4">
+                        <span className={`px-3 py-1 rounded-full text-xs font-semibold ${
+                          donation.status === 'completed' ? 'bg-green-100 text-green-800' :
+                          donation.status === 'pending' ? 'bg-yellow-100 text-yellow-800' : 'bg-red-100 text-red-800'
+                        }`}>
+                          {donation.status}
+                        </span>
+                      </td>
+                      <td className="py-3 px-4">
+                        <div className="flex items-center space-x-2">
+                          <button
+                            onClick={() => handlePreviewPDF(donation)}
+                            className="p-1 text-purple-600 hover:bg-purple-50 rounded"
+                            title="Preview & Download Receipt"
+                          >
+                            <Eye className="w-5 h-5" />
+                          </button>
+                          
+                          <div className="relative">
+                            <button
+                              onClick={() => setShowShareMenu(showShareMenu === donation.id ? null : donation.id)}
+                              className="p-1 text-green-600 hover:bg-green-50 rounded disabled:opacity-50"
+                              title="Share Receipt"
+                              disabled={isGeneratingPDF}
+                            >
+                              <Share2 className="w-5 h-5" />
+                            </button>
+
+                            {showShareMenu === donation.id && (
+                              <div className="absolute top-full right-0 mt-1 bg-white border border-gray-200 rounded-lg shadow-lg z-20 min-w-48">
+                                <div className="p-2">
+                                  <div className="text-xs font-medium text-gray-500 mb-2 px-2">Share PDF via:</div>
+                                  <button
+                                    onClick={() => handleSharePDF(donation, 'whatsapp')}
+                                    className="w-full text-left px-3 py-2 text-sm text-green-600 hover:bg-green-50 rounded flex items-center space-x-2 disabled:opacity-50"
+                                    disabled={isGeneratingPDF}
+                                  >
+                                    {isGeneratingPDF ? (
+                                      <span>Generating PDF...</span>
+                                    ) : (
+                                      <span>WhatsApp</span>
+                                    )}
+                                  </button>
+                                  <button
+                                    onClick={() => handleSharePDF(donation, 'email')}
+                                    className="w-full text-left px-3 py-2 text-sm text-blue-600 hover:bg-blue-50 rounded flex items-center space-x-2 disabled:opacity-50"
+                                    disabled={isGeneratingPDF}
+                                  >
+                                    {isGeneratingPDF ? (
+                                      <span>Generating PDF...</span>
+                                    ) : (
+                                      <span>Email</span>
+                                    )}
+                                  </button>
+                                  <button
+                                    onClick={() => handleSharePDF(donation, 'download')}
+                                    className="w-full text-left px-3 py-2 text-sm text-gray-600 hover:bg-gray-50 rounded flex items-center space-x-2 disabled:opacity-50"
+                                    disabled={isGeneratingPDF}
+                                  >
+                                    {isGeneratingPDF ? (
+                                      <span>Generating PDF...</span>
+                                    ) : (
+                                      <span>Download PDF</span>
+                                    )}
+                                  </button>
+                                </div>
+                              </div>
+                            )}
+                          </div>
+
+                          {!donation.receiptSent && (
+                            <button
+                              onClick={() => handleSendReceipt(donation.id)}
+                              className="p-1 text-blue-600 hover:bg-blue-50 rounded disabled:opacity-50"
+                              title="Send Receipt"
+                              disabled={isGeneratingPDF}
+                            >
+                              {isGeneratingPDF ? (
+                                <span className="animate-spin">⏳</span>
+                              ) : (
+                                <Mail className="w-5 h-5" />
+                              )}
+                            </button>
+                          )}
+                          <button
+                            onClick={() => handleEdit(donation)}
+                            className="p-1 text-orange-600 hover:bg-orange-50 rounded"
+                            title="Edit"
+                          >
+                            <Edit2 className="w-5 h-5" />
+                          </button>
+                          <button
+                            onClick={() => handleDelete(donation.id)}
+                            className="p-1 text-red-600 hover:bg-red-50 rounded disabled:opacity-50"
+                            title="Delete"
+                            disabled={actionLoading === donation.id}
+                          >
+                            {actionLoading === donation.id ? (
+                              <Loader2 className="w-5 h-5 animate-spin" />
+                            ) : (
+                              <Trash2 className="w-5 h-5" />
+                            )}
+                          </button>
+                        </div>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+              {filteredDonations.length === 0 && (
+                <div className="text-center py-8 text-gray-500">
+                  No donations found for the selected filters
+                </div>
+              )}
+            </>
           )}
         </div>
       </div>
@@ -809,6 +866,17 @@ export default function DonationManagement() {
                 </div>
 
                 <div className="sm:col-span-2">
+                  <label className="block text-sm font-medium text-gray-700 mb-2">Donor Address</label>
+                  <textarea
+                    value={formData.donorAddress}
+                    onChange={(e) => setFormData({ ...formData, donorAddress: e.target.value })}
+                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-900 focus:border-transparent outline-none"
+                    placeholder="Enter donor's address"
+                    rows="3"
+                  />
+                </div>
+
+                <div className="sm:col-span-2">
                   <label className="block text-sm font-medium text-gray-700 mb-2">Purpose</label>
                   <select
                     value={formData.purpose}
@@ -840,14 +908,17 @@ export default function DonationManagement() {
                   type="button"
                   onClick={resetForm}
                   className="px-6 py-2 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50 transition-colors"
+                  disabled={submitLoading}
                 >
                   Cancel
                 </button>
                 <button
                   type="submit"
-                  className="px-6 py-2 bg-blue-900 text-white rounded-lg hover:bg-blue-800 transition-colors"
+                  className="px-6 py-2 bg-blue-900 text-white rounded-lg hover:bg-blue-800 transition-colors flex items-center space-x-2 disabled:opacity-50"
+                  disabled={submitLoading}
                 >
-                  {editingDonation ? 'Update' : 'Add'} Donation
+                  {submitLoading && <Loader2 className="w-4 h-4 animate-spin" />}
+                  <span>{editingDonation ? 'Update' : 'Add'} Donation</span>
                 </button>
               </div>
             </form>

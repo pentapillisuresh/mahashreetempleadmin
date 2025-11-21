@@ -1,16 +1,27 @@
-import { useState } from 'react';
-import { Plus, Search, CheckCircle, XCircle, Edit2, Trash2, Mail, Phone, Eye } from 'lucide-react';
+import { useState, useEffect } from 'react';
+import { Plus, Search, CheckCircle, XCircle, Edit2, Trash2, Mail, Phone, Eye, RefreshCw } from 'lucide-react';
 import { useData } from '../contexts/DataContext';
 import ViewVolunteerModal from '../pages/ViewVolunteerModal';
 
 export default function VolunteerManagement() {
-  const { volunteers, addVolunteer, updateVolunteer, deleteVolunteer } = useData();
+  const { 
+    volunteers, 
+    addVolunteer, 
+    updateVolunteer, 
+    deleteVolunteer, 
+    updateVolunteerStatus,
+    loadVolunteersFromAPI,
+    loading,
+    error 
+  } = useData();
+  
   const [showModal, setShowModal] = useState(false);
   const [viewModal, setViewModal] = useState(false);
   const [editingVolunteer, setEditingVolunteer] = useState(null);
   const [viewingVolunteer, setViewingVolunteer] = useState(null);
   const [searchTerm, setSearchTerm] = useState('');
   const [filterStatus, setFilterStatus] = useState('all');
+  const [refreshLoading, setRefreshLoading] = useState(false);
 
   const [formData, setFormData] = useState({
     fullName: '',
@@ -42,14 +53,35 @@ export default function VolunteerManagement() {
   const bloodGroups = ['A+', 'A-', 'B+', 'B-', 'AB+', 'AB-', 'O+', 'O-'];
   const maritalStatuses = ['Single', 'Married', 'Divorced', 'Widowed'];
 
-  const handleSubmit = (e) => {
+  // Load volunteers on component mount
+  useEffect(() => {
+    loadVolunteersFromAPI();
+  }, []);
+
+  const handleRefresh = async () => {
+    setRefreshLoading(true);
+    await loadVolunteersFromAPI({
+      status: filterStatus !== 'all' ? filterStatus : undefined,
+      search: searchTerm || undefined
+    });
+    setRefreshLoading(false);
+  };
+
+  const handleSubmit = async (e) => {
     e.preventDefault();
-    if (editingVolunteer) {
-      updateVolunteer(editingVolunteer.id, formData);
-    } else {
-      addVolunteer(formData);
+    try {
+      if (editingVolunteer) {
+        await updateVolunteer(editingVolunteer.id, formData);
+      } else {
+        await addVolunteer(formData);
+      }
+      resetForm();
+      // Refresh the list after successful operation
+      await loadVolunteersFromAPI();
+    } catch (error) {
+      console.error('Error submitting volunteer:', error);
+      // Error handling is done in the context
     }
-    resetForm();
   };
 
   const resetForm = () => {
@@ -94,25 +126,42 @@ export default function VolunteerManagement() {
     setViewModal(true);
   };
 
-  const handleApprove = (id) => {
-    updateVolunteer(id, {
-      status: 'approved',
-      adminNotes: formData.adminNotes || 'Volunteer application approved.'
-    });
+  const handleApprove = async (id) => {
+    try {
+      await updateVolunteerStatus(id, 'approved');
+      await loadVolunteersFromAPI();
+    } catch (error) {
+      console.error('Error approving volunteer:', error);
+    }
   };
 
-  const handleReject = (id) => {
-    updateVolunteer(id, {
-      status: 'rejected',
-      adminNotes: formData.adminNotes || 'Volunteer application rejected.'
-    });
+  const handleReject = async (id) => {
+    try {
+      await updateVolunteerStatus(id, 'rejected');
+      await loadVolunteersFromAPI();
+    } catch (error) {
+      console.error('Error rejecting volunteer:', error);
+    }
   };
 
-  const handleStatusChange = (id, newStatus) => {
-    updateVolunteer(id, {
-      status: newStatus,
-      adminNotes: formData.adminNotes || `Status changed to ${newStatus}`
-    });
+  const handleStatusChange = async (id, newStatus) => {
+    try {
+      await updateVolunteerStatus(id, newStatus);
+      await loadVolunteersFromAPI();
+    } catch (error) {
+      console.error('Error updating volunteer status:', error);
+    }
+  };
+
+  const handleDelete = async (id) => {
+    if (window.confirm('Are you sure you want to delete this volunteer?')) {
+      try {
+        await deleteVolunteer(id);
+        await loadVolunteersFromAPI();
+      } catch (error) {
+        console.error('Error deleting volunteer:', error);
+      }
+    }
   };
 
   const handleInterestChange = (interest) => {
@@ -129,10 +178,20 @@ export default function VolunteerManagement() {
     }));
   };
 
+  const handleSearch = (e) => {
+    setSearchTerm(e.target.value);
+  };
+
+  const handleFilterChange = (e) => {
+    setFilterStatus(e.target.value);
+  };
+
+  // Apply filters locally for immediate feedback, but you can also use API filtering
   const filteredVolunteers = volunteers.filter(volunteer => {
     const matchesSearch = volunteer.fullName?.toLowerCase().includes(searchTerm.toLowerCase()) ||
                          volunteer.email?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                         volunteer.phoneNumber?.includes(searchTerm);
+                         volunteer.phoneNumber?.includes(searchTerm) ||
+                         volunteer.volunteerId?.toLowerCase().includes(searchTerm.toLowerCase());
     const matchesStatus = filterStatus === 'all' || volunteer.status === filterStatus;
     return matchesSearch && matchesStatus;
   });
@@ -253,18 +312,40 @@ export default function VolunteerManagement() {
 
   return (
     <div className="space-y-6">
+      {/* Error Display */}
+      {error && (
+        <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-lg">
+          <div className="flex justify-between items-center">
+            <span>{error}</span>
+            <button onClick={() => {}} className="text-red-500 hover:text-red-700">
+              ×
+            </button>
+          </div>
+        </div>
+      )}
+
       <div className="flex justify-between items-center">
         <div>
           <h1 className="text-3xl font-bold text-gray-800">Volunteer Management</h1>
           <p className="text-gray-600 mt-1">Manage volunteer applications and assignments</p>
         </div>
-        <button
-          onClick={() => setShowModal(true)}
-          className="bg-blue-900 text-white px-6 py-3 rounded-lg flex items-center space-x-2 hover:bg-blue-800 transition-colors"
-        >
-          <Plus className="w-5 h-5" />
-          <span>Add Volunteer</span>
-        </button>
+        <div className="flex items-center space-x-3">
+          <button
+            onClick={handleRefresh}
+            disabled={refreshLoading}
+            className="flex items-center space-x-2 px-4 py-2 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50 transition-colors disabled:opacity-50"
+          >
+            <RefreshCw className={`w-4 h-4 ${refreshLoading ? 'animate-spin' : ''}`} />
+            <span>Refresh</span>
+          </button>
+          <button
+            onClick={() => setShowModal(true)}
+            className="bg-blue-900 text-white px-6 py-3 rounded-lg flex items-center space-x-2 hover:bg-blue-800 transition-colors"
+          >
+            <Plus className="w-5 h-5" />
+            <span>Add Volunteer</span>
+          </button>
+        </div>
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
@@ -304,15 +385,15 @@ export default function VolunteerManagement() {
             <Search className="w-5 h-5 absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" />
             <input
               type="text"
-              placeholder="Search volunteers by name, email, or phone..."
+              placeholder="Search volunteers by name, email, phone, or ID..."
               value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
+              onChange={handleSearch}
               className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-900 focus:border-transparent outline-none"
             />
           </div>
           <select
             value={filterStatus}
-            onChange={(e) => setFilterStatus(e.target.value)}
+            onChange={handleFilterChange}
             className="px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-900 focus:border-transparent outline-none"
           >
             <option value="all">All Status</option>
@@ -328,6 +409,7 @@ export default function VolunteerManagement() {
           <table className="w-full">
             <thead>
               <tr className="bg-gray-50 border-b border-gray-200">
+                <th className="text-left py-3 px-4 font-semibold text-gray-700">Volunteer ID</th>
                 <th className="text-left py-3 px-4 font-semibold text-gray-700">Volunteer</th>
                 <th className="text-left py-3 px-4 font-semibold text-gray-700">Contact</th>
                 <th className="text-left py-3 px-4 font-semibold text-gray-700">Qualification</th>
@@ -340,6 +422,11 @@ export default function VolunteerManagement() {
             <tbody>
               {filteredVolunteers.map((volunteer) => (
                 <tr key={volunteer.id} className="border-b border-gray-100 hover:bg-gray-50 transition-colors">
+                  <td className="py-3 px-4">
+                    <div className="font-mono text-sm text-gray-600 bg-gray-50 px-2 py-1 rounded border">
+                      {volunteer.volunteerId || 'N/A'}
+                    </div>
+                  </td>
                   <td className="py-3 px-4">
                     <div>
                       <div className="font-medium text-gray-800">{volunteer.fullName}</div>
@@ -406,11 +493,7 @@ export default function VolunteerManagement() {
                         <Edit2 className="w-4 h-4" />
                       </button>
                       <button
-                        onClick={() => {
-                          if (window.confirm('Are you sure you want to delete this volunteer?')) {
-                            deleteVolunteer(volunteer.id);
-                          }
-                        }}
+                        onClick={() => handleDelete(volunteer.id)}
                         className="p-1.5 text-red-600 hover:bg-red-50 rounded-lg border border-red-200 transition-colors"
                         title="Delete Volunteer"
                       >
@@ -422,7 +505,17 @@ export default function VolunteerManagement() {
               ))}
             </tbody>
           </table>
-          {filteredVolunteers.length === 0 && (
+          
+          {loading && (
+            <div className="text-center py-8">
+              <div className="inline-flex items-center space-x-2 text-gray-600">
+                <RefreshCw className="w-5 h-5 animate-spin" />
+                <span>Loading volunteers...</span>
+              </div>
+            </div>
+          )}
+          
+          {!loading && filteredVolunteers.length === 0 && (
             <div className="text-center py-12 text-gray-500">
               <div className="text-lg font-medium mb-2">No volunteers found</div>
               <div className="text-sm">
@@ -436,6 +529,7 @@ export default function VolunteerManagement() {
         </div>
       </div>
 
+      {/* Add/Edit Volunteer Modal */}
       {showModal && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
           <div className="bg-white rounded-xl max-w-4xl w-full max-h-[90vh] overflow-y-auto">
@@ -717,9 +811,10 @@ export default function VolunteerManagement() {
                 </button>
                 <button
                   type="submit"
-                  className="px-6 py-2 bg-blue-900 text-white rounded-lg hover:bg-blue-800 transition-colors"
+                  disabled={loading}
+                  className="px-6 py-2 bg-blue-900 text-white rounded-lg hover:bg-blue-800 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                 >
-                  {editingVolunteer ? 'Update' : 'Add'} Volunteer
+                  {loading ? 'Processing...' : (editingVolunteer ? 'Update' : 'Add') + ' Volunteer'}
                 </button>
               </div>
             </form>

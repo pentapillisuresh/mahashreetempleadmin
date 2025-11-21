@@ -1,16 +1,17 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Plus, Edit2, Trash2, ExternalLink, Eye, Search, Image as ImageIcon, X } from 'lucide-react';
 import { useData } from '../contexts/DataContext';
 import ViewProjectModal from '../pages/ViewProjectModal';
 
 export default function ProjectManagement() {
-  const { projects, addProject, updateProject, deleteProject } = useData();
+  const { projects, addProject, updateProject, deleteProject, loadProjectsFromAPI } = useData();
   const [showModal, setShowModal] = useState(false);
   const [viewModal, setViewModal] = useState(false);
   const [editingProject, setEditingProject] = useState(null);
   const [viewingProject, setViewingProject] = useState(null);
   const [searchTerm, setSearchTerm] = useState('');
   const [filterStatus, setFilterStatus] = useState('all');
+  const [loading, setLoading] = useState(false);
 
   const [formData, setFormData] = useState({
     title: '',
@@ -18,33 +19,52 @@ export default function ProjectManagement() {
     category: 'Medical',
     status: 'active',
     donationLink: '',
-    images: [], // Array for multiple images
+    images: [],
     startDate: '',
     endDate: '',
     volunteersRequired: '',
-    currentProgress: 0
+    currentProgress: 0,
+    objective: '',
+    targetBeneficiaries: '',
+    budget: '',
+    contactPerson: '',
+    contactInfo: {}
   });
 
   const categories = ['Medical', 'Education', 'Social Welfare', 'Infrastructure', 'Cultural', 'Environmental', 'Other'];
 
-  const handleSubmit = (e) => {
+  // Load projects from API on component mount
+  useEffect(() => {
+    loadProjects();
+  }, []);
+
+  const loadProjects = async () => {
+    setLoading(true);
+    try {
+      await loadProjectsFromAPI();
+    } catch (error) {
+      console.error('Failed to load projects:', error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleSubmit = async (e) => {
     e.preventDefault();
     
-    const projectData = {
-      ...formData,
-      // Remove file objects from images array before storing
-      images: formData.images.map(img => ({
-        ...img,
-        file: undefined // Remove file object, keep only URL
-      }))
-    };
-
-    if (editingProject) {
-      updateProject(editingProject.id, projectData);
-    } else {
-      addProject(projectData);
+    try {
+      if (editingProject) {
+        await updateProject(editingProject.id, formData);
+      } else {
+        await addProject(formData);
+      }
+      resetForm();
+      // Reload projects to get updated data from API
+      await loadProjects();
+    } catch (error) {
+      console.error('Failed to save project:', error);
+      alert('Failed to save project: ' + error.message);
     }
-    resetForm();
   };
 
   const resetForm = () => {
@@ -58,7 +78,12 @@ export default function ProjectManagement() {
       startDate: '',
       endDate: '',
       volunteersRequired: '',
-      currentProgress: 0
+      currentProgress: 0,
+      objective: '',
+      targetBeneficiaries: '',
+      budget: '',
+      contactPerson: '',
+      contactInfo: {}
     });
     setEditingProject(null);
     setShowModal(false);
@@ -78,6 +103,18 @@ export default function ProjectManagement() {
     setViewModal(true);
   };
 
+  const handleDelete = async (projectId) => {
+    if (window.confirm('Are you sure you want to delete this project?')) {
+      try {
+        await deleteProject(projectId);
+        await loadProjects();
+      } catch (error) {
+        console.error('Failed to delete project:', error);
+        alert('Failed to delete project: ' + error.message);
+      }
+    }
+  };
+
   const handleImageUpload = (e) => {
     const files = Array.from(e.target.files);
     const newImages = files.map(file => ({
@@ -93,7 +130,6 @@ export default function ProjectManagement() {
       images: [...prev.images, ...newImages]
     }));
 
-    // Clear the file input
     e.target.value = '';
   };
 
@@ -143,6 +179,14 @@ export default function ProjectManagement() {
     if (progress >= 50) return 'bg-yellow-500';
     return 'bg-red-500';
   };
+
+  if (loading) {
+    return (
+      <div className="flex justify-center items-center h-64">
+        <div className="text-lg">Loading projects...</div>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6">
@@ -289,7 +333,7 @@ export default function ProjectManagement() {
                         <Edit2 className="w-5 h-5" />
                       </button>
                       <button
-                        onClick={() => deleteProject(project.id)}
+                        onClick={() => handleDelete(project.id)}
                         className="p-1 text-red-600 hover:bg-red-50 rounded"
                         title="Delete"
                       >
@@ -347,6 +391,17 @@ export default function ProjectManagement() {
                     ></textarea>
                   </div>
 
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">Objective</label>
+                    <textarea
+                      value={formData.objective}
+                      onChange={(e) => setFormData({ ...formData, objective: e.target.value })}
+                      rows="3"
+                      className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-900 focus:border-transparent outline-none"
+                      placeholder="Project goals and objectives..."
+                    ></textarea>
+                  </div>
+
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                     <div>
                       <label className="block text-sm font-medium text-gray-700 mb-2">Category *</label>
@@ -384,7 +439,7 @@ export default function ProjectManagement() {
                       <input
                         type="number"
                         value={formData.currentProgress}
-                        onChange={(e) => setFormData({ ...formData, currentProgress: e.target.value })}
+                        onChange={(e) => setFormData({ ...formData, currentProgress: parseInt(e.target.value) || 0 })}
                         className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-900 focus:border-transparent outline-none"
                         min="0"
                         max="100"
@@ -426,6 +481,32 @@ export default function ProjectManagement() {
                     </div>
                   </div>
 
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-2">Budget</label>
+                      <input
+                        type="number"
+                        value={formData.budget}
+                        onChange={(e) => setFormData({ ...formData, budget: e.target.value })}
+                        placeholder="Total project budget"
+                        className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-900 focus:border-transparent outline-none"
+                        step="0.01"
+                        min="0"
+                      />
+                    </div>
+
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-2">Target Beneficiaries</label>
+                      <input
+                        type="text"
+                        value={formData.targetBeneficiaries}
+                        onChange={(e) => setFormData({ ...formData, targetBeneficiaries: e.target.value })}
+                        placeholder="Who will benefit from this project"
+                        className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-900 focus:border-transparent outline-none"
+                      />
+                    </div>
+                  </div>
+
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-2">Donation Link</label>
                     <input
@@ -433,6 +514,17 @@ export default function ProjectManagement() {
                       value={formData.donationLink}
                       onChange={(e) => setFormData({ ...formData, donationLink: e.target.value })}
                       placeholder="https://example.com/donate"
+                      className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-900 focus:border-transparent outline-none"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">Contact Person</label>
+                    <input
+                      type="text"
+                      value={formData.contactPerson}
+                      onChange={(e) => setFormData({ ...formData, contactPerson: e.target.value })}
+                      placeholder="Project coordinator name"
                       className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-900 focus:border-transparent outline-none"
                     />
                   </div>
